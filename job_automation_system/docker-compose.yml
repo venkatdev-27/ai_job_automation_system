@@ -41,6 +41,7 @@ services:
       - "3000:3000"
       - "9222:9222"
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MAX_CONCURRENT_SESSIONS=10
       - CONNECTION_TIMEOUT=60000
       - MAX_QUEUE_LENGTH=20
@@ -71,13 +72,14 @@ services:
       dockerfile: Dockerfile
     container_name: celery-naukri-1-v2
     restart: unless-stopped
-    command: celery -A celery_app.app worker -Q naukri -c 2 -O fair --loglevel=info --hostname=naukri-1@%h
+    command: celery -A celery_app.app worker -Q naukri -c 1 -O fair --loglevel=info --hostname=naukri-1@%h
     depends_on:
       redis:
         condition: service_healthy
       chrome-cdp:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=naukri
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -129,6 +131,7 @@ services:
       chrome-cdp:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=naukri
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -173,11 +176,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: celery-linkedin-1-v2
-    command: celery -A celery_app.app worker -Q linkedin -c 2 -O fair --loglevel=info --hostname=linkedin-1@%h
+    command: celery -A celery_app.app worker -Q linkedin -c 1 -O fair --loglevel=info --hostname=linkedin-1@%h
     depends_on:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=linkedin
       - PROFILE_NAMESPACE=linkedin
       - LINKEDIN_USE_CDP=false
@@ -225,6 +229,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=linkedin
       - PROFILE_NAMESPACE=linkedin
       - LINKEDIN_USE_CDP=false
@@ -268,11 +273,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: celery-foundit-1-v2
-    command: celery -A celery_app.app worker -Q foundit -c 2 -O fair --loglevel=info --hostname=foundit-1@%h
+    command: celery -A celery_app.app worker -Q foundit -c 1 -O fair --loglevel=info --hostname=foundit-1@%h
     depends_on:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=foundit
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -318,6 +324,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=foundit
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -338,6 +345,7 @@ services:
       - RESUMES_DIR=/app/ai_engine/resumes
       - GROQ_API_KEY=${GROQ_API_KEY}
       - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+      - CHROME_PATH=/ms-playwright/chromium-1097/chrome-linux/chrome
     volumes:
       - ./logs:/app/logs
       - ../temp_resumes:/app/temp_resumes
@@ -365,6 +373,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_TASK_SCOPE=beat
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -395,6 +404,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=warmup
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -438,6 +448,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=producer
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -480,6 +491,7 @@ services:
       chrome-cdp:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_QUEUE=student_wave
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
@@ -537,6 +549,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - MONGO_URI=${MONGO_URI}
       - MONGO_DB=${MONGO_DB}
       - REDIS_HOST=redis
@@ -576,6 +589,7 @@ services:
     volumes:
       - ../ai_engine/resumes:/app/ai_engine/resumes
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - IN_DOCKER=true
       - PYTHONPATH=/app
       - PROJECT_ROOT=/app
@@ -618,6 +632,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - PYTHONPATH=/app
@@ -661,19 +676,47 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: job-automation-cadvisor-v2
+    ports:
+      - "18080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command:
+      - '--docker_only=true'
+      - '--store_container_labels=false'
+    networks:
+      - job-automation-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
   grafana:
     image: grafana/grafana:10.1.0
     container_name: job-automation-grafana-v2
     ports:
       - "3001:3000"
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - ./monitoring/grafana/dashboard.json:/var/lib/grafana/dashboards/job-automation.json
-      - ./monitoring/grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-      - ./monitoring/grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+      - ./grafana/provisioning/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
@@ -727,6 +770,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - REDIS_HOST=redis
       - MONGO_URI=${MONGO_URI}
       - MONGO_DB=${MONGO_DB}

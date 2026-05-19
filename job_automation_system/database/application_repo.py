@@ -53,7 +53,7 @@ class ApplicationRepository:
         """Get applications by student and platform."""
         filter_query = {
             "student_id": student_id,
-            "platform": platform,
+            "platform": {"$regex": f"^{platform}$", "$options": "i"},
         }
         
         docs = self.collection.find(filter_query).sort("applied_at", -1).limit(limit) if limit > 0 else self.collection.find(filter_query).sort("applied_at", -1)
@@ -69,7 +69,7 @@ class ApplicationRepository:
         """Get applications by status."""
         filter_query = {"status": status}
         if platform:
-            filter_query["platform"] = platform
+            filter_query["platform"] = {"$regex": f"^{platform}$", "$options": "i"}
         
         docs = self.collection.find(filter_query).limit(limit) if limit > 0 else self.collection.find(filter_query)
         
@@ -84,7 +84,7 @@ class ApplicationRepository:
         """Check if application already exists."""
         filter_query = {
             "student_id": student_id,
-            "platform": platform,
+            "platform": {"$regex": f"^{platform}$", "$options": "i"},
             "job_id": job_id,
         }
         return self.collection.count_documents(filter_query) > 0
@@ -210,7 +210,7 @@ class ApplicationRepository:
         if student_id:
             filter_query["student_id"] = student_id
         if platform:
-            filter_query["platform"] = platform
+            filter_query["platform"] = {"$regex": f"^{platform}$", "$options": "i"}
         
         docs = (
             self.collection.find(filter_query)

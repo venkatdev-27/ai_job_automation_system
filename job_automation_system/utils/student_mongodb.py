@@ -399,9 +399,11 @@ def update_student_profile(student_id: str, profile_data: dict) -> bool:
             "primary_role": profile_data.get("primary_role"),
             "skills": profile_data.get("skills", []),
             "categorized_skills": profile_data.get("categorized_skills", {}),
+            "education": profile_data.get("education", []),
             "experience": profile_data.get("experience", []),
             "projects": profile_data.get("projects", []),
             "master_template": profile_data.get("master_template", {}),
+            "full_text": profile_data.get("full_text", ""),
             "last_extracted": datetime.now().isoformat()
         }
         

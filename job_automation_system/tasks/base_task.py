@@ -482,38 +482,60 @@ class BasePlatformTask(Task):
             
             # Update application status - handle both "applied" and "completed" statuses
             if result.get("status") == "applied" or result.get("applied", 0) > 0:
-                mark_application_applied(
-                    str(application.id),
-                    result.get("job_title"),
-                    result.get("company"),
-                )
-                
-                # Notify dashboard via Socket.io
-                notify_application(
-                    student_id=student_id,
-                    platform=platform,
-                    job_title=result.get("job_title", "N/A"),
-                    company=result.get("company", "N/A"),
-                    status="applied",
-                    resume_variant=resume_variant,
-                    resume_url=result.get("resume_url", ""),
-                    job_url=job_url,
-                )
+                if job_batch:
+                    # For batch execution, we delete the temporary task-level pending record
+                    # since the individual successful applications are already recorded
+                    # by the scraper via notify-application.
+                    try:
+                        from bson import ObjectId
+                        from database.client import get_collection
+                        get_collection("job_applications").delete_one({"_id": ObjectId(application.id)})
+                    except Exception as del_err:
+                        logger.warning(f"Failed to delete batch task pending record: {del_err}")
+                else:
+                    mark_application_applied(
+                        str(application.id),
+                        result.get("job_title"),
+                        result.get("company"),
+                    )
+                    
+                    # Notify dashboard via Socket.io
+                    notify_application(
+                        student_id=student_id,
+                        platform=platform,
+                        job_title=result.get("job_title", "N/A"),
+                        company=result.get("company", "N/A"),
+                        status="applied",
+                        resume_variant=resume_variant,
+                        resume_url=result.get("resume_url", ""),
+                        job_url=job_url,
+                    )
             elif result.get("status") == "failed" or (result.get("applied", 0) == 0 and result.get("status") == "completed"):
-                mark_application_failed(str(application.id), result.get("error", ""))
-                
-                # Notify dashboard of failure
-                notify_application(
-                    student_id=student_id,
-                    platform=platform,
-                    job_title=result.get("job_title", "N/A"),
-                    company=result.get("company", "N/A"),
-                    status="failed",
-                    resume_variant=resume_variant,
-                    resume_url=result.get("resume_url", ""),
-                    job_url=job_url,
-                    error=result.get("error"),
-                )
+                if job_batch and result.get("status") == "completed":
+                    # Mark it as skipped rather than failed for successful scan with 0 applications
+                    try:
+                        from database import application_repository
+                        application_repository.mark_skipped(
+                            str(application.id),
+                            "Scanned successfully but applied to 0 jobs (match or cap filters)"
+                        )
+                    except Exception as skip_err:
+                        logger.warning(f"Failed to mark batch task as skipped: {skip_err}")
+                else:
+                    mark_application_failed(str(application.id), result.get("error", ""))
+                    
+                    # Notify dashboard of failure
+                    notify_application(
+                        student_id=student_id,
+                        platform=platform,
+                        job_title=result.get("job_title", "N/A"),
+                        company=result.get("company", "N/A"),
+                        status="failed",
+                        resume_variant=resume_variant,
+                        resume_url=result.get("resume_url", ""),
+                        job_url=job_url,
+                        error=result.get("error"),
+                    )
             
             self._task_succeeded = True
             return result

@@ -61,7 +61,8 @@ class ResumeOrchestrator:
         self.settings = settings
 
     async def generate_resume_pipeline(self, retrieved_chunks: str, job_description: str, 
-                                       student_id: str = None, master_template: Dict[str, Any] = None) -> Dict[str, Any]:
+                                       student_id: str = None, master_template: Dict[str, Any] = None,
+                                       summary: str = None) -> Dict[str, Any]:
         logger.info("Starting Dynamic Resume Generation Pipeline")
         
         # Store master template for use in template generation
@@ -128,6 +129,10 @@ class ResumeOrchestrator:
             target_company, source_keywords, jd_keywords
         )
         
+        # Override LLM generated summary with explicit pre-generated summary if provided
+        if summary:
+            extraction_results["summary"] = summary
+        
         # Map skills to categories dynamically using the SkillEngine (Parallel Harmonization)
         extraction_results["skills"] = await self._harmonize_skills_async(
             extraction_results.get("skills", {}),
@@ -156,6 +161,11 @@ class ResumeOrchestrator:
             pdf_path_output = RESUME_OUTPUT_DIR / pdf_filename
 
         pdf_path = await generate_pdf(resume_html, str(pdf_path_output))
+        try:
+            with open(pdf_path_output.with_suffix(".html"), "w", encoding="utf-8") as f:
+                f.write(resume_html)
+        except Exception as html_err:
+            logger.warning(f"Could not write debug HTML file: {html_err}")
 
         path_contract = _resume_path_contract(pdf_path)
 
@@ -266,7 +276,7 @@ class ResumeOrchestrator:
 4. TOTAL DATA RETENTION: Include every project and every work experience entry found in the data. Do not omit any.
 5. BULLET PARITY: Maintain the original count of bullets. If a project has 5 bullets, return 5 improved bullets.
 6. NO JD INJECTION: DO NOT include tech stacks from the JOB DESCRIPTION that are not present in the CANDIDATE DATA. If a skill is in the JD but not the candidate data, IGNORE it.
-7. SUMMARY ONLY: The 'summary' field (48-60 words) remains the only section you may dynamically tailor to the JD, but ONLY using candidate's actual skills/projects.
+7. SUMMARY PRESERVATION: If 'Professional Summary:' is present in the CANDIDATE DATA, you MUST extract and output that exact text verbatim in the 'summary' key of your JSON. Do NOT summarize or change it.
 8. DATA INTEGRITY: Use ONLY information found in the CANDIDATE DATA or RAG ENHANCED CONTEXT. 
 9. ABSOLUTE JSON: Return only valid JSON. No preamble. No comments."""
 
@@ -341,12 +351,10 @@ OUTPUT JSON SCHEMA:
 1. SECTION HEADERS: LEFT-ALIGNED with uppercase and FULL-WIDTH underline border
    - Use: <h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">SECTION NAME</h2>
 
-2. PROFESSIONAL SUMMARY - MUST BE 55 WORDS EXACTLY with 4-5 lines paragraph:
-   - Write 4-5 sentences forming a paragraph
-   - MUST be exactly 50-60 words (prefer 55 words)
-   - CRITICAL: DO NOT mention "years of experience", tenure, "seasoned", "experienced", or numbers of years.
-   - Focus strictly on technical skills and key project highlights found in the candidate data.
-   - Use high-impact action verbs (Engineered, Developed, Optimized, Architected).
+2. PROFESSIONAL SUMMARY - USE THE EXACT TEXT FROM THE "summary" FIELD OF THE INPUT JSON VERBATIM:
+   - Do NOT rewrite, modify, rephrase, or shorten this summary.
+   - Use the text from the "summary" key of the input JSON exactly as provided.
+   - Ensure it is displayed as a clean paragraph under the section header.
 
 3. TECHNICAL SKILLS - DYNAMIC CATEGORIES BASED ON ACTUAL SKILLS:
    - ANALYZE the skills in the JSON data
@@ -371,7 +379,7 @@ OUTPUT JSON SCHEMA:
    <ul><li>Description 1</li><li>Description 2</li></ul>
 
 6. SECTION ORDER (EXACT):
-   - PROFESSIONAL SUMMARY (55 words paragraph)
+   - PROFESSIONAL SUMMARY (Use exact text from JSON without truncating)
    - EDUCATION  
    - TECHNICAL SKILLS (dynamic categories based on actual skills, each on new line)
    - EXPERIENCE (with company | duration)
@@ -413,6 +421,18 @@ GENERATE HTML for this resume:
         # Surgical Strike: Delete everything BEFORE the first H2 header (e.g., Professional Summary)
         # This permanently removes the duplicate name/contact info circled in red.
         content = re.sub(r'^.*?<h2', '<h2', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Surgical Summary Injection: Force the verbatim generated summary into the HTML
+        if data.get("summary"):
+            summary_verbatim = data["summary"].strip()
+            pattern_h2 = r"(<h2[^>]*>\s*PROFESSIONAL\s+SUMMARY\s*</h2>)(.*?)(?=<h2)"
+            new_content, count = re.subn(pattern_h2, rf"\g<1>\n<p>{summary_verbatim}</p>\n", content, flags=re.IGNORECASE | re.DOTALL)
+            if count > 0:
+                content = new_content
+            else:
+                pattern_p = r"(<h2[^>]*>\s*PROFESSIONAL\s+SUMMARY\s*</h2>\s*)<p[^>]*>.*?</p>"
+                content = re.sub(pattern_p, rf"\g<1><p>{summary_verbatim}</p>", content, flags=re.IGNORECASE | re.DOTALL)
+        
         
         # Extract Socials
         links = data.get('links', [])

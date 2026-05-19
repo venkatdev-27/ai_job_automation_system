@@ -21,6 +21,24 @@ const AUTO_STOP_CONFIG = {
     emitIntervalMs: 30000          // Emit status to clients every 30s
 };
 
+const CELERY_QUEUES = ['producer', 'student_wave', 'naukri', 'linkedin', 'foundit', 'warmup'];
+const DEFAULT_SCHEDULED_TIMES = ['06:00', '11:00', '17:00', '20:00', '22:30'];
+
+function parseTimeOfDay(value) {
+    const match = String(value || '').trim().match(/^(\d{2}):(\d{2})$/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return { hour, minute };
+}
+
+function hasReachedTimeOfDay(now, timeValue) {
+    const parsed = parseTimeOfDay(timeValue);
+    if (!parsed) return false;
+    return (now.getHours() * 60 + now.getMinutes()) >= (parsed.hour * 60 + parsed.minute);
+}
+
 class AutoStopDetector {
     constructor(redisClient, db) {
         this.redis = redisClient;
@@ -52,15 +70,26 @@ class AutoStopDetector {
 
     async checkRedisJobStatus() {
         try {
-            const jobsRunning = parseInt(await this.redis.get('automation:jobs_running') || '0', 10);
-            const jobsQueued = parseInt(await this.redis.get('automation:jobs_queue') || '0', 10);
+            const jobsRunningRaw = await this.redis.get('automation:jobs_running');
+            const jobsRunningParsed = parseInt(jobsRunningRaw || '0', 10);
+            const jobsRunning = Number.isFinite(jobsRunningParsed) ? jobsRunningParsed : 0;
+            let queueLength = 0;
+            for (const queue of CELERY_QUEUES) {
+                queueLength += parseInt(await this.redis.llen(queue) || '0', 10);
+            }
+            const unacked = parseInt(await this.redis.hlen('unacked') || '0', 10);
+            const jobsQueued = queueLength + unacked;
             const autoStopEnabled = await this.redis.get('automation:auto_stop');
+            const autoOffTime = await this.redis.get('automation:auto_off_time');
             
             return {
                 jobsRunning,
                 jobsQueued,
+                queueLength,
+                unacked,
                 autoStopEnabled: autoStopEnabled === 'true',
-                autoStopEnabledRaw: autoStopEnabled
+                autoStopEnabledRaw: autoStopEnabled,
+                autoOffTime: autoOffTime || '23:59'
             };
         } catch (error) {
             console.error('[AutoStop] Redis check failed:', error.message);
@@ -143,6 +172,16 @@ class AutoStopDetector {
             
             if (error) return { shouldStop: false, reason: 'Redis error' };
             if (!autoStopEnabled) return { shouldStop: false, reason: 'Auto-stop disabled' };
+
+            const autoOffReached = hasReachedTimeOfDay(new Date(), status.redis.autoOffTime);
+            const studentsProcessing = status.mongo.studentsProcessing;
+            if (autoOffReached && jobsRunning === 0 && jobsQueued === 0 && studentsProcessing === 0) {
+                return {
+                    shouldStop: true,
+                    reason: `Auto-off time reached (${status.redis.autoOffTime}) and system is idle`,
+                };
+            }
+
             if (!status.autoStop.minRuntimeMet) return { shouldStop: false, reason: 'Minimum runtime not met' };
             
             // Check if stable (no jobs running AND no jobs queued)
@@ -211,7 +250,7 @@ class AutoStopDetector {
                 message,
                 timestamp: new Date().toISOString(),
                 workersStopped: workersResult.stopped,
-                nextAutoStart: this.getNextScheduledStart()
+                nextAutoStart: await this.getNextScheduledStart()
             });
         }
         
@@ -223,10 +262,29 @@ class AutoStopDetector {
         };
     }
 
-    getNextScheduledStart() {
+    async getNextScheduledStart() {
         const now = new Date();
-        const schedules = ['06:00', '11:00', '17:00', '20:00'];
+        let schedules = DEFAULT_SCHEDULED_TIMES;
+        try {
+            const configuredSchedule = await this.redis.get('automation:daily_schedule');
+            const configuredTimes = String(configuredSchedule || '')
+                .split(',')
+                .map((item) => item.trim())
+                .filter((item) => /^\d{2}:\d{2}$/.test(item));
+            if (configuredTimes.length > 0) {
+                schedules = configuredTimes;
+            }
+        } catch (e) {
+            console.error('[AutoStop] Error reading daily schedule for next start calculation:', e.message);
+        }
         
+        // Sort schedules chronologically
+        schedules.sort((a, b) => {
+            const [hA, mA] = a.split(':').map(Number);
+            const [hB, mB] = b.split(':').map(Number);
+            return (hA * 60 + mA) - (hB * 60 + mB);
+        });
+
         for (const time of schedules) {
             const [h, m] = time.split(':').map(Number);
             const next = new Date(now);
@@ -237,10 +295,12 @@ class AutoStopDetector {
             }
         }
         
-        // Next day 6AM
+        // Next day first schedule
+        const firstTime = schedules[0] || '06:00';
+        const [h, m] = firstTime.split(':').map(Number);
         const next = new Date(now);
         next.setDate(next.getDate() + 1);
-        next.setHours(6, 0, 0, 0);
+        next.setHours(h, m, 0, 0);
         return next.toLocaleString();
     }
 

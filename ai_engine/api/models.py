@@ -8,6 +8,7 @@ class ResumeRequest(BaseModel):
     refreshCache: bool = Field(False, description="Whether to force a fresh generation.")
     student_id: Optional[str] = Field(None, description="Student ID to use their master template")
     master_template: Optional[Dict[str, Any]] = Field(None, description="Master template config from student's master resume")
+    summary: Optional[str] = Field(None, description="Pre-generated professional summary to bypass LLM extraction")
 
 class ResumeSubScores(BaseModel):
     keywordMatch: int

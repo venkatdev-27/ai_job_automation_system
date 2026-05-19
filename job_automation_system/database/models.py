@@ -154,6 +154,8 @@ class JobApplicationUpdate(BaseModel):
     applied_at: Optional[datetime] = None
     retry_count: Optional[int] = None
     error_message: Optional[str] = None
+    job_title: Optional[str] = None
+    company: Optional[str] = None
 
 
 # ==================== Task Execution Models ====================

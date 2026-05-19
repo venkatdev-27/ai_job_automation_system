@@ -37,16 +37,17 @@ logger = logging.getLogger(__name__)
 
 
 SCHEDULE_PLATFORM_JOBS = {
-    "morning-6am": {"foundit": 7, "naukri": 1, "linkedin": 1},
-    "afternoon-11am": {"foundit": 4, "naukri": 1, "linkedin": 1},
-    "evening-5pm": {"foundit": 2, "naukri": 3, "linkedin": 3},
-    "night-8pm": {"foundit": 1, "naukri": 1, "linkedin": 1},
-    "recovery-1030pm": {"foundit": 4, "naukri": 1, "linkedin": 1},
-    "manual": {"foundit": 4, "naukri": 1, "linkedin": 1},
-    "recovery": {"foundit": 4, "naukri": 1, "linkedin": 1},
+    "morning-6am": {"naukri": 1, "linkedin": 1, "foundit": 7},
+    "afternoon-11am": {"naukri": 1, "linkedin": 1, "foundit": 4},
+    "evening-5pm": {"naukri": 3, "linkedin": 3, "foundit": 2},
+    "night-8pm": {"naukri": 1, "linkedin": 1, "foundit": 1},
+    "recovery-1030pm": {"naukri": 1, "linkedin": 1, "foundit": 4},
+    "manual": {"naukri": 2, "linkedin": 2, "foundit": 2},
+    "recovery": {"naukri": 1, "linkedin": 1, "foundit": 4},
 }
 
-PLATFORM_ORDER = ("foundit", "naukri", "linkedin")
+# Sequential order: naukri → linkedin → foundit
+PLATFORM_ORDER = ("naukri", "linkedin", "foundit")
 
 
 class StudentWaveTask(Task):
@@ -174,13 +175,16 @@ class StudentWaveTask(Task):
 
         task = self._task_for_platform(platform)
         started = time.time()
-        eager_result = task.apply(
-            args=[student.student_id, primary_job_url, resume_variant],
-            kwargs={"job_batch": job_batch},
-        )
 
+        # Run the platform task directly (in-process, synchronous) to avoid
+        # the "Never call result.get() within a task" Celery deadlock.
         try:
-            result = eager_result.get()
+            eager_res = task.apply(
+                args=[student.student_id, primary_job_url, resume_variant],
+                kwargs={"job_batch": job_batch},
+                throw=True,
+            )
+            result = eager_res.result
         except Exception as exc:
             return {
                 "status": "failed",

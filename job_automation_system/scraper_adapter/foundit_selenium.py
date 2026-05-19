@@ -100,39 +100,45 @@ class FoundItSelenium:
             self.options.add_argument(f'--user-data-dir={self.profile_path}')
         
         try:
-            # Find chrome binary
+            # Find chrome binary — check env var first (Docker), then common paths
             import glob
-            chrome_paths = [
-                "/ms-playwright/chromium-*/chrome-linux/chrome",
-                "/usr/bin/google-chrome",
-                "C:/Program Files/Google/Chrome/Application/chrome.exe",
-                "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
-            ]
-            
-            chrome_path = None
-            for p in chrome_paths:
-                found = glob.glob(p)
-                if found:
-                    chrome_path = found[0]
-                    break
+            import os as _os
+            chrome_path = _os.environ.get("CHROME_PATH") or _os.environ.get("CHROMIUM_PATH")
             
             if not chrome_path:
-                chrome_path = "/usr/bin/google-chrome" # Fallback
+                chrome_paths = [
+                    "/ms-playwright/chromium-*/chrome-linux/chrome",
+                    "/usr/bin/google-chrome",
+                    "/usr/bin/chromium",
+                    "/usr/bin/chromium-browser",
+                    "C:/Program Files/Google/Chrome/Application/chrome.exe",
+                    "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
+                ]
+                for p in chrome_paths:
+                    found = glob.glob(p)
+                    if found:
+                        chrome_path = found[0]
+                        break
+            
+            if not chrome_path:
+                chrome_path = "/usr/bin/google-chrome"  # Fallback
                 
             self.logger.log_info(f"Using Chrome binary: {chrome_path}")
             chrome_major = self._detect_chrome_major(chrome_path)
             if chrome_major:
                 self.logger.log_info(f"Using Chrome major version: {chrome_major}")
             
-            # Initialize driver
+            # Initialize driver — use_subprocess=True prevents blocking on binary patching
             self.driver = uc.Chrome(
                 options=self.options, 
                 browser_executable_path=chrome_path,
                 version_main=chrome_major,
+                use_subprocess=True,
             )
             
             self.driver.set_page_load_timeout(45)
             self.driver.implicitly_wait(5)
+
             
         except Exception as e:
             self.logger.log_err(f"Selenium initialization failed: {e}")
@@ -171,8 +177,8 @@ class FoundItSelenium:
                 
                 self.logger.log_info(f"Current URL: {self.driver.current_url}")
 
-                # Check if already logged in (redirected to dashboard)
-                if "login" not in self.driver.current_url.lower() and "rio" in self.driver.current_url.lower():
+                # Check if already logged in (redirected to dashboard/profile)
+                if "login" not in self.driver.current_url.lower() and "otp" not in self.driver.current_url.lower():
                     self.logger.log_ok("Already logged in (session restored)")
                     return True
 
@@ -288,9 +294,8 @@ class FoundItSelenium:
             self.driver.get(search_url)
             time.sleep(5)
             
-            # 3. Process Job Cards
+            # 3. Collect all job URLs from search page UPFRONT (avoids fragile ancestor XPath)
             try:
-                # Wait for job cards (indicated by the presence of apply buttons)
                 WebDriverWait(self.driver, 20).until(
                     EC.presence_of_element_located((By.ID, "applyBtn"))
                 )
@@ -298,44 +303,59 @@ class FoundItSelenium:
                 self.logger.log_warn("No jobs found for this query")
                 return {"status": "success", "applied": 0, "skipped": 0}
 
-            # Find all apply buttons (which correspond to job cards)
+            # Collect job detail URLs from card title links
+            job_urls = []
+            try:
+                # FoundIt card links pattern: /job/<slug>-<id>
+                all_links = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/job/']")
+                seen = set()
+                for lnk in all_links:
+                    href = lnk.get_attribute("href") or ""
+                    if href and href not in seen:
+                        seen.add(href)
+                        job_urls.append(href)
+            except Exception as e:
+                self.logger.log_warn(f"Could not collect job URLs: {e}")
+
             job_buttons = self.driver.find_elements(By.ID, "applyBtn")
-            self.logger.log_info(f"Found {len(job_buttons)} job cards")
-            
-            max_to_process = min(len(job_buttons), getattr(settings, "max_applies_per_run", 5))
-            
+            self.logger.log_info(f"Found {len(job_buttons)} job cards, {len(job_urls)} unique JD URLs")
+
+            max_to_process = min(
+                max(len(job_urls), len(job_buttons)),
+                getattr(settings, "max_applies_per_run", 5)
+            )
+            search_results_url = self.driver.current_url
+            applied_jobs = []  # track (title, company) for each applied job
+
             for i in range(max_to_process):
-                # Re-fetch buttons in case of DOM changes
                 try:
-                    current_buttons = self.driver.find_elements(By.ID, "applyBtn")
-                    if i >= len(current_buttons): break
-                    
-                    button = current_buttons[i]
-                    # Scroll to button
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
-                    time.sleep(1)
-                    
-                    # Process this job
-                    result = self._process_single_job(i, profile)
+                    jd_url = job_urls[i] if i < len(job_urls) else None
+                    result = self._process_single_job(i, profile,
+                                                      jd_url=jd_url,
+                                                      search_results_url=search_results_url)
                     if result == "applied":
                         applied_count += 1
+                        applied_jobs.append((self._last_applied_job_title, self._last_applied_company))
                     elif result == "skipped":
                         skipped_count += 1
-                        
-                    # Stop if we hit target
+
                     if applied_count >= getattr(settings, "max_applies_per_run", 5):
                         break
-                        
+
                 except Exception as e:
                     self.logger.log_err(f"Error processing job card {i}: {e}")
                     continue
 
+            final_title = applied_jobs[-1][0] if applied_jobs else self._last_applied_job_title
+            final_company = applied_jobs[-1][1] if applied_jobs else self._last_applied_company
+
             return {
-                "status": "success", 
-                "applied": applied_count, 
+                "status": "success",
+                "applied": applied_count,
                 "skipped": skipped_count,
-                "job_title": self._last_applied_job_title,
-                "company": self._last_applied_company
+                "job_title": final_title,
+                "company": final_company,
+                "applied_jobs": applied_jobs,
             }
 
         except Exception as e:
@@ -344,42 +364,127 @@ class FoundItSelenium:
         finally:
             self.close()
 
-    def _process_single_job(self, index: int, profile: Any) -> str:
+    def _extract_job_title_company(self) -> tuple:
+        """Multi-strategy extraction of job title and company from FoundIt JD page."""
+        job_title = None
+        company_name = None
+
+        # --- Job Title: try multiple selectors ---
+        title_selectors = [
+            (By.CSS_SELECTOR, "h1.jd-title"),
+            (By.CSS_SELECTOR, "h1[class*='jd']"),
+            (By.CSS_SELECTOR, "h1[class*='title']"),
+            (By.CSS_SELECTOR, "h1[class*='job']"),
+            (By.TAG_NAME, "h1"),
+        ]
+        for by, sel in title_selectors:
+            try:
+                el = self.driver.find_element(by, sel)
+                text = (el.text or "").strip()
+                if text and text.lower() not in ("unknown", ""):
+                    job_title = text
+                    break
+            except:
+                continue
+
+        # --- Company: try multiple selectors ---
+        company_selectors = [
+            # New FoundIt class names (2024-2025)
+            (By.CSS_SELECTOR, "a[class*='line-clamp'][href*='-jobs-career']"),
+            (By.CSS_SELECTOR, "a[class*='line-clamp'][href*='/company/']"),
+            (By.CSS_SELECTOR, "a[href*='-jobs-career']"),
+            (By.CSS_SELECTOR, "a[href*='/company/']"),
+            # Older class names
+            (By.CSS_SELECTOR, "a[class*='text-darkKnight']"),
+            (By.CSS_SELECTOR, "span[class*='company']"),
+            (By.CSS_SELECTOR, "div[class*='company'] a"),
+            # Generic fallback: look for company link near title
+            (By.XPATH, "//h1/following-sibling::*//a[1]"),
+            (By.XPATH, "//section//a[contains(@href, '/company/')][1]"),
+        ]
+        for by, sel in company_selectors:
+            try:
+                el = self.driver.find_element(by, sel)
+                text = (el.text or "").strip()
+                if text and text.lower() not in ("unknown", ""):
+                    company_name = text
+                    break
+            except:
+                continue
+
+        # Last resort: try to parse from page title ("Role - Company - Foundit")
+        if not job_title or not company_name:
+            try:
+                page_title = self.driver.title or ""
+                if " - " in page_title:
+                    parts = [p.strip() for p in page_title.split(" - ")]
+                    if not job_title and len(parts) >= 1:
+                        job_title = job_title or parts[0]
+                    if not company_name and len(parts) >= 2:
+                        company_name = company_name or parts[1]
+            except:
+                pass
+
+        # Clean company name of experience prefix and location suffix if matched
+        if company_name and company_name.lower() not in ("unknown", ""):
+            import re
+            # Strip "X Years of Experience at " or similar prefix
+            company_name = re.sub(r'(?i).*\bexperience\s+at\s+', '', company_name)
+            # Strip any location suffix starting with " in " (case-insensitive)
+            company_name = re.split(r'(?i)\s+in\s+', company_name)[0]
+            company_name = company_name.strip(', ')
+
+        return (job_title or "Unknown", company_name or "Unknown")
+
+    def _process_single_job(self, index: int, profile: Any,
+                            jd_url: str = None,
+                            search_results_url: str = None) -> str:
         """Extract JD, match skills, and apply via Selenium."""
         try:
-            # 1. Identify Job and Open JD
-            # Find the title link relative to the apply button
-            # Structure: card -> h2 -> a
-            try:
-                # Re-fetch cards
-                cards = self.driver.find_elements(By.CLASS_NAME, "srp-left") # Or similar card container
-                # Easier: find the button again and go up
-                button = self.driver.find_elements(By.ID, "applyBtn")[index]
-                # Find the link in the same card (usually preceded by h2/a)
-                # Foundit structure: card container -> h2.job-tittle -> a
-                # We'll use XPath to find the nearest link above the button
-                link = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'card')]//h2/a | ./ancestor::div[contains(@class, 'srp')]//h2/a")
-                job_url = link.get_attribute("href")
-            except:
-                self.logger.log_warn(f"Job {index}: Could not find JD link")
+            # 1. Resolve job URL
+            job_url = jd_url
+            if not job_url:
+                # Fallback: find the i-th apply button and traverse to get link
+                try:
+                    button = self.driver.find_elements(By.ID, "applyBtn")[index]
+                    # Try multiple XPath strategies to find the job link
+                    for xpath in [
+                        "./ancestor::article//a[contains(@href, '/job/')][1]",
+                        "./ancestor::div[contains(@class,'card')]//a[contains(@href,'/job/')][1]",
+                        "./ancestor::li//a[contains(@href,'/job/')][1]",
+                        "./preceding::a[contains(@href,'/job/')][1]",
+                    ]:
+                        try:
+                            link = button.find_element(By.XPATH, xpath)
+                            href = link.get_attribute("href")
+                            if href:
+                                job_url = href
+                                break
+                        except:
+                            continue
+                except:
+                    pass
+
+            if not job_url:
+                self.logger.log_warn(f"Job {index}: Could not find JD URL")
                 return "skipped"
 
-            search_results_url = self.driver.current_url
-            
-            # 2. Open JD Page
+            if not search_results_url:
+                search_results_url = self.driver.current_url
+
+            # 2. Open JD Page and wait for it to load
             self.driver.get(job_url)
-            time.sleep(3)
-            
-            # 3. Extract Identity and JD text
             try:
-                job_title = self.driver.find_element(By.TAG_NAME, "h1").text
-                company_name = self.driver.find_element(By.XPATH, "//a[contains(@class, 'text-darkKnight-500')]").text
+                WebDriverWait(self.driver, 15).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "h1"))
+                )
             except:
-                job_title = "Unknown"
-                company_name = "Unknown"
-            
+                time.sleep(4)  # Fallback wait
+
+            # 3. Extract Job Title and Company using multi-strategy extraction
+            job_title, company_name = self._extract_job_title_company()
             self.logger.log_info(f"Evaluating: {job_title} at {company_name}")
-            
+
             # Expand "View More" if exists
             try:
                 view_more = self.driver.find_element(By.XPATH, "//button[contains(., 'View More')]")
@@ -387,25 +492,28 @@ class FoundItSelenium:
                 time.sleep(1)
             except:
                 pass
-                
+
             # Extract JD text
             jd_text = ""
             try:
-                jd_container = self.driver.find_element(By.XPATH, "//div[contains(@class, 'job-description')]")
+                jd_container = self.driver.find_element(
+                    By.XPATH,
+                    "//div[contains(@class,'job-desc') or contains(@class,'job-description') or contains(@class,'jd-desc')]"
+                )
                 jd_text = jd_container.text
             except:
                 jd_text = self.driver.find_element(By.TAG_NAME, "body").text
-                
+
             # 4. Skill Matching
             jd_skills = extract_skills_from_jd(jd_text)
             self.logger.log_info(f"JD Skills: {', '.join(jd_skills[:10])}")
-            
+
             profile_skills = getattr(profile, 'skills', [])
             match_result = calculate_match_percentage(profile_skills, jd_skills, self.MATCH_PERCENTAGE_MIN)
             match_pct = match_result.get('percentage', 0)
-            
+
             self.logger.log_info(f"Match: {match_pct}% (Threshold: {self.MATCH_PERCENTAGE_MIN}%)")
-            
+
             if match_pct < self.MATCH_PERCENTAGE_MIN:
                 self.logger.log_info("Match too low, skipping")
                 self.driver.get(search_results_url)
@@ -414,25 +522,23 @@ class FoundItSelenium:
             # 5. Resume Selection
             selector = ResumeSelector(getattr(profile, 'student_id', 'default'))
             res_type, res_path, res_source = selector.select_resume(jd_text, jd_skills, profile_skills, job_title)
-            
-            # Handle AI Tailoring if needed
+
             if res_type == "AI_TAILOR_NEEDED":
                 self.logger.log_info("Triggering AI tailoring...")
                 res_path = self._generate_ai_resume(jd_text, profile)
-            
+
             if not res_path or not os.path.exists(res_path):
                 self.logger.log_warn("No resume available for application")
                 self.driver.get(search_results_url)
                 return "skipped"
 
             # 6. Apply
-            # Step A: Update resume on profile first to be safe
             self._update_resume_on_profile(str(res_path))
-            
-            # Step B: Return to JD and click Apply
+
+            # Return to JD page
             self.driver.get(job_url)
             time.sleep(2)
-            
+
             try:
                 apply_btn = self._find_apply_button(timeout=15)
                 self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", apply_btn)
@@ -441,32 +547,44 @@ class FoundItSelenium:
                     apply_btn.click()
                 except Exception:
                     self.driver.execute_script("arguments[0].click();", apply_btn)
-                time.sleep(3)
-                
-                # Check for "Applied Successfully" or similar
+                time.sleep(4)
+
+                # Check success indicators
                 success_indicators = [
-                    "//div[contains(text(), 'Applied successfully')]",
-                    "//button[contains(text(), 'Applied')]",
-                    "//div[contains(text(), 'Thanks for applying')]"
+                    "//div[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'applied successfully')]",
+                    "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'applied')]",
+                    "//div[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'thanks for applying')]",
+                    "//span[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'applied')]",
                 ]
-                
-                applied = False
-                for indicator in success_indicators:
-                    if self.driver.find_elements(By.XPATH, indicator):
-                        applied = True
-                        break
-                
+                applied = any(
+                    self.driver.find_elements(By.XPATH, ind)
+                    for ind in success_indicators
+                )
+
+                # Store title/company regardless of success detection
+                self._last_applied_job_title = job_title
+                self._last_applied_company = company_name
+
                 if applied:
-                    self.logger.log_ok(f"Applied successfully to {job_title}!")
-                    self._last_applied_job_title = job_title
-                    self._last_applied_company = company_name
-                    # Return to search
-                    self.driver.get(search_results_url)
-                    return "applied"
+                    self.logger.log_ok(f"Applied successfully to {job_title} at {company_name}!")
                 else:
-                    self.logger.log_warn("Application submitted but success not verified")
-                    self.driver.get(search_results_url)
-                    return "applied" # Often it just works without a clear message
+                    self.logger.log_warn(f"Applied (unverified) to {job_title} at {company_name}")
+
+                # Notify dashboard
+                try:
+                    import asyncio
+                    asyncio.run(self.logger.log_application_success(
+                        job_id=f"foundit_{index}_{int(time.time())}",
+                        title=job_title,
+                        company=company_name,
+                        platform="foundit",
+                        student_id=getattr(profile, "student_id", None)
+                    ))
+                except Exception as report_err:
+                    self.logger.log_warn(f"Dashboard reporting failed: {report_err}")
+
+                self.driver.get(search_results_url)
+                return "applied"
 
             except Exception as e:
                 self.logger.log_err(f"Apply button interaction failed: {e}")

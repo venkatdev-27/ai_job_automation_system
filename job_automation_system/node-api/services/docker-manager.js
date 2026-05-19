@@ -96,7 +96,7 @@ class DockerManager {
 
         for (const name of allContainers) {
             const lower = name.toLowerCase();
-            if (lower.includes('redis') || lower.includes('chrome-cdp') || lower.includes('ai-engine') || lower.includes('node-api') || lower.includes('grafana') || lower.includes('prometheus') || lower.includes('cadvisor') || lower.includes('flower')) {
+            if (lower.includes('redis') || lower.includes('chrome-cdp') || lower.includes('ai-engine') || lower.includes('node-api') || lower.includes('automation-api') || lower.includes('grafana') || lower.includes('prometheus') || lower.includes('cadvisor') || lower.includes('flower')) {
                 if (!workerMap[name]) infraMap[name] = true;
             }
             if (lower.includes('celery-') || lower.includes('producer')) {

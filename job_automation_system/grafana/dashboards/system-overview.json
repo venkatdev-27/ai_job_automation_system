@@ -63,7 +63,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "count(container_last_seen{name=~\"job-automation-celery.*\"})",
+          "expr": "job_automation_workers_running",
           "legendFormat": "Workers Running",
           "refId": "A"
         }
@@ -418,7 +418,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg(container_memory_usage_bytes{name=~\"job-automation-.*\"} / container_spec_memory_limit_bytes{name=~\"job-automation-.*\"}) * 100",
+          "expr": "100 * sum(container_memory_usage_bytes{name=~\".*(job-automation|celery).*\"}) / sum(container_spec_memory_limit_bytes{name=~\".*(job-automation|celery).*\"} > 0)",
           "legendFormat": "Memory",
           "refId": "A"
         }
@@ -477,7 +477,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "avg(rate(container_cpu_usage_seconds_total{name=~\"job-automation-.*\"}[5m])) * 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\".*(job-automation|celery).*\"}[5m])) * 100",
           "legendFormat": "CPU",
           "refId": "A"
         }

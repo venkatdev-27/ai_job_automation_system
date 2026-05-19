@@ -52,15 +52,7 @@ def _execute_warmup(student_id: str) -> dict[str, Any]:
                 "student_id": student_id,
             }
 
-        # Generate roles
-        try:
-            from role_manager.dynamic_role_generator import generate_dynamic_resumes_from_skills
-            roles_list = generate_dynamic_resumes_from_skills(skills)
-            roles = {r["role_key"]: r for r in roles_list}
-        except Exception as e:
-            log.log_warn(f"Role generation failed: {e}")
-            roles = {}
-        
+
         # Generate resumes ASYNC
         import asyncio
         from rag_engine.rag_resume_generator import RAGResumeGenerator
@@ -68,6 +60,9 @@ def _execute_warmup(student_id: str) -> dict[str, Any]:
         async def _gen_resumes_internal():
             generator = RAGResumeGenerator(logger=log, student_id=str(student_id))
             generator.rag_engine = None
+            await generator._init_rag()
+            if not generator.custom_roles:
+                await generator.discover_top_roles()
             result = await generator.generate_initial_resumes()
             resumes = {}
             for key, resume in result.items():
@@ -76,9 +71,9 @@ def _execute_warmup(student_id: str) -> dict[str, Any]:
                     "path": resume.file_path,
                     "success": bool(resume.file_path)
                 }
-            return resumes
+            return resumes, generator.custom_roles
 
-        resumes = asyncio.run(_gen_resumes_internal())
+        resumes, roles = asyncio.run(_gen_resumes_internal())
 
         update_student(student_id, {
             "custom_roles": roles,

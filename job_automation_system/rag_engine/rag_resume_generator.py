@@ -195,6 +195,7 @@ class CandidateProfile:
     experience: list[dict] = field(default_factory=list)
     projects: list[dict] = field(default_factory=list)
     master_template: dict = field(default_factory=dict)  # NEW: Template from master resume
+    full_text: str = ""
 
     @classmethod
     def from_mongo(cls, data: dict) -> 'CandidateProfile':
@@ -217,6 +218,7 @@ class CandidateProfile:
             experience=data.get("experience", []),
             projects=data.get("projects", []),
             master_template=data.get("master_template", {}),
+            full_text=data.get("full_text", ""),
         )
 
 
@@ -424,6 +426,20 @@ class RAGResumeGenerator:
             return
             
         try:
+            # Try to download resume from Cloudinary if not provided locally
+            if not file_path or not os.path.exists(file_path):
+                from utils.student_mongodb import get_student_resume_url
+                resume_url = get_student_resume_url(self.student_id)
+                if resume_url:
+                    from utils.resume_downloader import download_if_needed
+                    try:
+                        print(f"  [DOWNLOAD] Downloading resume from URL: {resume_url}")
+                        downloaded_path = download_if_needed(resume_url, self.student_id)
+                        if downloaded_path and os.path.exists(downloaded_path):
+                            file_path = downloaded_path
+                    except Exception as e:
+                        print(f"  [ERROR] Failed to download resume: {e}")
+
             from utils.pdf_reader import extract_text_from_pdf
             
             # 1. Extract text from resume file (always do this)
@@ -449,25 +465,57 @@ class RAGResumeGenerator:
             self.full_text = text_content
             print(f"  [TEXT] Extracted {len(self.full_text)} chars from resume")
             
-            # Simple extraction - use raw text directly
-            if not self.profile or force_extract:
-                # Try to get profile from MongoDB first
+            # 2. Resolve Profile
+            # Try to get profile from MongoDB first if not already loaded
+            if not self.profile:
                 from utils.student_mongodb import get_student_by_id
                 student_doc = get_student_by_id(self.student_id)
-                if student_doc and not force_extract:
-                    if 'skills' in student_doc and student_doc['skills']:
-                        print("  [DB] Found existing profile in MongoDB")
-                        self.profile = CandidateProfile.from_mongo(student_doc)
-                    
-                    # Fix fallback for full_text
+                if student_doc:
+                    self.profile = CandidateProfile.from_mongo(student_doc)
                     if not self.full_text and 'full_text' in student_doc:
                         self.full_text = student_doc['full_text']
                         print(f"  [DB] Loaded full_text from MongoDB ({len(self.full_text)} chars)")
+            
+            # Check if we need to force re-extract due to missing critical fields or force_extract
+            needs_extraction = False
+            if force_extract:
+                needs_extraction = True
+            elif not self.profile:
+                needs_extraction = True
+            else:
+                # Check for missing critical data
+                missing_fields = []
+                if not self.profile.skills:
+                    missing_fields.append("skills")
+                if not self.profile.education:
+                    missing_fields.append("education")
+                if not self.profile.experience and not self.profile.projects:
+                    missing_fields.append("experience/projects")
+                if not self.full_text:
+                    missing_fields.append("full_text")
+                
+                if missing_fields:
+                    print(f"  [CHECK] Profile is missing critical fields: {', '.join(missing_fields)}. Triggering re-extraction...")
+                    needs_extraction = True
+
+            if needs_extraction and text_content:
+                print(f"  [SIMPLE] Extracting profile from {len(text_content)} chars...")
+                self.profile = await self._parse_profile_from_context(text_content)
+                
+                # Sync the newly extracted profile back to MongoDB
+                if self.profile and self.profile.skills:
+                    from utils.student_mongodb import update_student_profile
+                    from dataclasses import asdict
+                    profile_dict = asdict(self.profile)
+                    
+                    # Also get master template if it exists in db
+                    from utils.student_mongodb import get_student_by_id
+                    student_doc = get_student_by_id(self.student_id)
+                    if student_doc and 'master_template' in student_doc:
+                        profile_dict['master_template'] = student_doc['master_template']
                         
-                if (not self.profile or force_extract) and text_content:
-                    # Use simple text extraction as final fallback
-                    print(f"  [SIMPLE] Extracting profile from {len(text_content)} chars...")
-                    self.profile = await self._parse_profile_from_context(text_content)
+                    update_student_profile(self.student_id, profile_dict)
+                    print("  [DB] Updated student profile in MongoDB with extracted data")
             
             self._initialized = True
         except Exception as e:
@@ -532,6 +580,7 @@ class RAGResumeGenerator:
                     categorized_skills=result.get("categorized_skills", {}),
                     experience=result.get("experience", []),
                     projects=result.get("projects", []),
+                    full_text=context,
                 )
                 print(f"  [PROFILE] Extracted: {profile.full_name} | Skills: {len(profile.skills)}")
                 return profile
@@ -548,41 +597,110 @@ class RAGResumeGenerator:
             valid_skills = valid_skills[:5] if valid_skills else candidate_skills[:5]
             skills_str = ', '.join(valid_skills)
             
+            # 1. Check if fresher (no professional experience or experience has only internships)
+            is_fresher = True
+            if self.profile and self.profile.experience:
+                has_job = False
+                for exp in self.profile.experience:
+                    title = exp.get("title", "").lower()
+                    company = exp.get("company", "").lower()
+                    bullets = " ".join(exp.get("bullets", [])).lower()
+                    if "intern" not in title and "intern" not in company and "intern" not in bullets:
+                        has_job = True
+                        break
+                if has_job:
+                    is_fresher = False
+
+            # 2. Build detailed description of experience/internships/projects
             exp_text = ""
             if self.profile and self.profile.experience:
-                for exp in self.profile.experience[:2]:
-                    exp_text += f"- {exp.get('title', '')} at {exp.get('company', '')}. "
-            elif self.profile and self.profile.projects:
-                for proj in self.profile.projects[:1]:
-                    exp_text += f"- Worked on {proj.get('title', 'projects')}. "
+                for exp in self.profile.experience[:3]:
+                    title = exp.get("title", "")
+                    company = exp.get("company", "")
+                    bullets = exp.get("bullets", [])
+                    # Classify if internship
+                    is_intern = any(w in title.lower() or w in company.lower() or any(w in b.lower() for b in bullets) for w in ["intern", "trainee"])
+                    role_type = "Internship" if is_intern else "Professional Role"
+                    bullets_summary = "; ".join(bullets[:2]) if bullets else "hands-on implementation"
+                    exp_text += f"- {role_type}: {title} at {company} (Key achievements: {bullets_summary}). "
+            
+            # If candidate is a fresher or has no experience, also append academic/personal projects
+            if (is_fresher or not exp_text) and self.profile and self.profile.projects:
+                for proj in self.profile.projects[:2]:
+                    title = proj.get("title", "Project")
+                    bullets = proj.get("bullets", [])
+                    bullets_summary = "; ".join(bullets[:2]) if bullets else "hands-on application development"
+                    exp_text += f"- Academic/Personal Project: {title} (Key achievements: {bullets_summary}). "
             
             # Get random sample of verbs for dynamic variety
             import random
             sample_verbs = random.sample(ACTION_VERBS[:50], min(10, 50))
             verbs_str = ", ".join(sample_verbs)
-            
+
+            if is_fresher:
+                fresher_guidelines = (
+                    "- The candidate is a FRESHER / ENTRY-LEVEL developer.\n"
+                    "- Focus on academic projects, internships, hands-on coding, and foundational engineering.\n"
+                    "- Highlight enthusiasm for clean code, learning agility, and contributing to development cycles.\n"
+                    "- DO NOT use any management, executive, or seasoned phrasing."
+                )
+            else:
+                fresher_guidelines = (
+                    "- Focus on professional software engineering achievements, system design, and production delivery.\n"
+                    "- Highlight professional impact, business value, and application lifecycle ownership."
+                )
+
             prompt = (
-                f"Write a powerful professional summary for a {role_title}.\n"
+                f"Locate the candidate's original 'Professional Summary', 'Summary', or 'Objective' in the Background text below.\n"
+                f"Rewrite and tailor that original summary specifically for a {role_title} role. If no original summary exists, write a new one based on the Background.\n"
                 f"STRICT RULES:\n"
-                f"- MUST be MINIMUM 45 words (can be 45-55 words for ATS optimization).\n"
+                f"- Return ONLY the final rewritten summary paragraph. No preambles, no labels, no original text.\n"
+                f"- MUST be exactly 45 words long.\n"
                 f"- Use STRONG, ATS-optimized action verbs from this list: {verbs_str}\n"
                 f"- Include skills: {skills_str}\n"
-                f"- Mention experience/internship: {exp_text}\n"
+                f"- Explicitly mention candidate's 'internship' or 'experience'.\n"
+                f"- Explicitly highlight 'enthusiasm for clean code' and 'learning agility'.\n"
                 f"- NO 'years', 'experienced', 'seasoned', or tenure references.\n"
                 f"- NO generic phrases like 'Dedicated professional'.\n"
+                f"{fresher_guidelines}\n"
                 f"- Focus on technical impact, achievements, and quantifiable results.\n"
                 f"Background: {self.full_text[:3000]}\n"
             )
-            summary = await llm.async_generate(prompt, system="Write minimum 45 words with strong verbs. Focus on technical achievements.", temperature=0.3)
+            summary = await llm.async_generate(prompt, system="Write a dynamic, high-impact summary of exactly 45 words. Focus on technical achievements and satisfy every rule.", temperature=0.3)
             
-            words = summary.strip().split()
-            if len(words) < 45:
-                summary = summary + " Demonstrated exceptional problem-solving abilities through innovative technical solutions and continuous improvement initiatives."
+            summary = summary.strip()
+            words = summary.split()
             
-            return summary.strip() or f"Technical expert specializing in {role_title} with expertise in {skills_str}."
+            # If the summary is not close to 45 words, adjust it dynamically
+            if len(words) < 42 or len(words) > 48:
+                print(f"  [SUMMARY] Summary length ({len(words)} words) is not close to 45 words. Adjusting dynamically...")
+                adjust_prompt = (
+                    f"Rewrite this professional summary to be exactly 45 words long.\n"
+                    f"You MUST satisfy every one of these rules:\n"
+                    f"1. Exactly 45 words long.\n"
+                    f"2. Explicitly mention the internship/experience.\n"
+                    f"3. Include skills: {skills_str}.\n"
+                    f"4. Explicitly highlight enthusiasm for clean code and learning agility.\n"
+                    f"Do not use generic filler text.\n\n"
+                    f"Current summary: {summary}"
+                )
+                adjusted = await llm.async_generate(adjust_prompt, system="Rewrite the summary to be exactly 45 words long satisfying all criteria.", temperature=0.3)
+                if adjusted:
+                    adjusted_words = adjusted.strip().split()
+                    if 40 <= len(adjusted_words) <= 50:
+                        summary = adjusted.strip()
+            
+            return summary
         except Exception as e:
             print(f"  [WARN] Summary generation failed: {e}")
-            return f"{role_title} specialist with expertise in {skills_str}. Proven track record of delivering high-quality technical solutions through innovative approaches and continuous improvement."
+            skills_part = f" specializing in {skills_str}" if skills_str else ""
+            fallback = (
+                f"Highly motivated and result-oriented {role_title}{skills_part}. "
+                f"Possesses a strong foundation in modern software engineering principles and hands-on experience "
+                f"developing robust, efficient applications. Committed to collaborating with cross-functional "
+                f"teams to build and deploy high-quality solutions while continuously expanding technical expertise."
+            )
+            return fallback
 
     async def _polish_bullets_async(self, original_bullets: list[str], role_title: str, jd_context: str) -> list[str]:
         """Polish bullets — ONLY rephrase words/verbs, NEVER change actual data from master resume."""
@@ -749,6 +867,7 @@ class RAGResumeGenerator:
             context_str += f"LinkedIn: {self.profile.linkedin}\nGitHub: {self.profile.github}\n"
             context_str += f"Location: {self.profile.location}\n"
             context_str += f"Education: {self.profile.education}\n"
+            context_str += f"Professional Summary: {summary}\n"
             context_str += f"Skills: {', '.join(self.profile.skills)}\n"
             context_str += "Experience:\n" + json.dumps(tailored_exp, indent=2) + "\n"
             context_str += "Projects:\n" + json.dumps(tailored_proj, indent=2)
@@ -762,7 +881,8 @@ class RAGResumeGenerator:
                 "disableCache": False,
                 "refreshCache": True,
                 "student_id": self.student_id,
-                "master_template": master_template
+                "master_template": master_template,
+                "summary": summary
             }
             
             api_url = os.environ.get("LOCAL_API_URL", "http://ai-engine:8000")
@@ -785,8 +905,11 @@ class RAGResumeGenerator:
                     elif generated_content and os.path.exists(generated_content):
                         import time
                         time.sleep(2)
-                        shutil.copy2(generated_content, target_path)
-                        print(f"    [OK] Saved PDF: {target_path}")
+                        if os.path.abspath(generated_content) != os.path.abspath(target_path):
+                            shutil.copy2(generated_content, target_path)
+                            print(f"    [OK] Saved PDF (copied from {generated_content})")
+                        else:
+                            print(f"    [OK] Saved PDF (already at target: {target_path})")
                     else:
                         print(f"    [WARN] No content generated")
                 else:

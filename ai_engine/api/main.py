@@ -135,7 +135,8 @@ async def generate_resume(request: ResumeRequest):
             retrieved_chunks=request.retrievedChunks,
             job_description=request.jobDescription,
             student_id=request.student_id,
-            master_template=request.master_template
+            master_template=request.master_template,
+            summary=request.summary
         )
         
         if not result.get("success"):

@@ -32,7 +32,7 @@ STOPWORDS = {
 # LLM Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 DEFAULT_PRIMARY_MODEL = "llama-3.1-8b-instant"
-DEFAULT_FALLBACK_MODELS = ["gemma2-9b-it", "llama-3.3-70b-versatile"]
+DEFAULT_FALLBACK_MODELS = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768"]
 
 ACTION_VERBS = {
     "accelerated", "achieved", "acquired", "adapted", "addressed", "administered", "advanced", "advised", "advocated",

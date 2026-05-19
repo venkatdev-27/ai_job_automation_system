@@ -317,7 +317,9 @@ class JobProducer:
         if not dry_run and schedule_name != "manual":
             try:
                 import requests
-                node_api_url = os.getenv("NODE_API_URL", "http://localhost:3000")
+                node_api_url = os.getenv("NODE_API_URL") or os.getenv("API_URL")
+                if not node_api_url:
+                    node_api_url = "http://node-api:5000" if os.getenv("IN_DOCKER", "").lower() == "true" else "http://localhost:5000"
                 requests.post(
                     f"{node_api_url}/api/automation/record-beat-trigger",
                     json={"schedule_name": schedule_name},

@@ -236,6 +236,9 @@ class NaukriApplyTask(BasePlatformTask):
                 "skipped_count": result.get("skipped", 0),
                 "student_id": student.student_id,
                 "platform": "naukri",
+                # Forward job identity so base_task can persist it to MongoDB
+                "job_title": result.get("job_title") or None,
+                "company": result.get("company") or None,
             }
             if scraper_error:
                 payload["status"] = "failed"
@@ -243,6 +246,7 @@ class NaukriApplyTask(BasePlatformTask):
             elif status and str(status).lower() not in ("ok", "applied", "success"):
                 payload["raw_status"] = str(status)
             return payload
+
             
         except Exception as e:
             logger.log_err(f"Scraper error: {e}")

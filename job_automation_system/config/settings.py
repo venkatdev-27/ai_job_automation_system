@@ -165,7 +165,7 @@ class Settings:
     circuit_breaker_threshold: int = field(default_factory=lambda: _int("CIRCUIT_BREAKER_THRESHOLD", 5))
 
     # Resume Selection & Matching (Global)
-    ats_threshold: float = field(default_factory=lambda: _float("ATS_THRESHOLD", 65.0))
+    ats_threshold: float = field(default_factory=lambda: _float("ATS_THRESHOLD", 20.0))
     circuit_breaker_timeout: int = field(default_factory=lambda: _int("CIRCUIT_BREAKER_TIMEOUT", 300))
 
     # Cloudinary

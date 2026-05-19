@@ -26,29 +26,29 @@ class WaveConfig:
 
 
 TIME_PERIOD_WEIGHTS = {
-    # 6AM run: FoundIt 50% + Naukri 25% + LinkedIn 25% = 7+1+1 = 9 jobs/student
+    # 6AM run: FoundIt=7, Naukri=1, LinkedIn=1 (Total = 9) => 77.8% FoundIt, 11.1% Naukri/LinkedIn
     "morning": {
-        "foundit": 0.50,
-        "naukri": 0.25,
-        "linkedin": 0.25,
+        "foundit": 0.778,
+        "naukri": 0.111,
+        "linkedin": 0.111,
     },
-    # 11AM run: Same distribution = 7+1+1 = 9 jobs/student
+    # 11AM run: FoundIt=4, Naukri=1, LinkedIn=1 (Total = 6) => 66.7% FoundIt, 16.7% Naukri/LinkedIn
     "afternoon": {
-        "foundit": 0.50,
-        "naukri": 0.25,
-        "linkedin": 0.25,
+        "foundit": 0.667,
+        "naukri": 0.167,
+        "linkedin": 0.167,
     },
-    # 5PM run: Same distribution = 7+1+1 = 9 jobs/student
+    # 5PM run: FoundIt=2, Naukri=3, LinkedIn=3 (Total = 8) => 25% FoundIt, 37.5% Naukri/LinkedIn
     "evening": {
-        "foundit": 0.50,
-        "naukri": 0.25,
-        "linkedin": 0.25,
+        "foundit": 0.25,
+        "naukri": 0.375,
+        "linkedin": 0.375,
     },
-    # 8PM run: Same distribution = 7+1+1 = 9 jobs/student
+    # 8PM run: FoundIt=1, Naukri=1, LinkedIn=1 (Total = 3) => 33.3% FoundIt, 33.3% Naukri/LinkedIn
     "night": {
-        "foundit": 0.50,
-        "naukri": 0.25,
-        "linkedin": 0.25,
+        "foundit": 0.333,
+        "naukri": 0.333,
+        "linkedin": 0.333,
     },
 }
 

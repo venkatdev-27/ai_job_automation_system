@@ -40,6 +40,13 @@ app.use(cors({
   origin: /^http:\/\/(localhost|127\.0\.0\.1):(3000|5173|5000)$/
 }));
 app.use(express.json());
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('Bad JSON parsing error:', err.message);
+    return res.status(400).send({ status: 400, message: err.message });
+  }
+  next(err);
+});
 
 // MongoDB connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/job_automation';
@@ -154,6 +161,11 @@ function normalizeStatus(raw = '') {
   if (s === 'skipped') return 'skipped';
   if (s === 'duplicate') return 'duplicate';
   return s || 'pending';
+}
+
+function parseMetricInt(value, fallback = 0) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function getTimeframeStart(timeframe = 'all') {
@@ -322,6 +334,23 @@ app.get('/metrics', async (req, res) => {
     const activeBrowsers = await redis.zcard('semaphore:browsers:leases') || 0;
     lines.push(_metricLine('job_automation_active_browsers', activeBrowsers));
 
+    try {
+      const workerStatus = await dockerManager.getWorkerStatus();
+      lines.push('# HELP job_automation_workers_total Total discovered worker containers');
+      lines.push('# TYPE job_automation_workers_total gauge');
+      lines.push(_metricLine('job_automation_workers_total', workerStatus.totalWorkers || 0));
+      lines.push('# HELP job_automation_workers_running Running worker containers');
+      lines.push('# TYPE job_automation_workers_running gauge');
+      lines.push(_metricLine('job_automation_workers_running', workerStatus.runningWorkers || 0));
+    } catch (workerError) {
+      lines.push('# HELP job_automation_workers_total Total discovered worker containers');
+      lines.push('# TYPE job_automation_workers_total gauge');
+      lines.push(_metricLine('job_automation_workers_total', 0));
+      lines.push('# HELP job_automation_workers_running Running worker containers');
+      lines.push('# TYPE job_automation_workers_running gauge');
+      lines.push(_metricLine('job_automation_workers_running', 0));
+    }
+
     lines.push('# HELP job_automation_queue_tasks Number of tasks in queue by platform');
     lines.push('# TYPE job_automation_queue_tasks gauge');
     for (const platform of platforms) {
@@ -362,15 +391,32 @@ app.get('/metrics', async (req, res) => {
       lines.push(_metricLine('job_automation_queue_length', len, { queue }));
     }
 
-    // Total queue + jobs_completed_today + jobs_running from Redis
+    // Total queue + jobs_completed_today + jobs_running
     lines.push('# HELP job_automation_jobs_completed_today Total jobs completed today');
     lines.push('# TYPE job_automation_jobs_completed_today gauge');
-    const completedToday = parseInt(await redis.get('automation:jobs_completed_today') || '0');
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const completedFromDb = await applicationsCollection.countDocuments({
+      status: 'applied',
+      $or: [
+        { applied_at: { $gte: todayStart } },
+        { updated_at: { $gte: todayStart } },
+      ],
+    });
+    const completedToday = Math.max(
+      completedFromDb,
+      parseMetricInt(await redis.get('automation:jobs_completed_today') || '0')
+    );
     lines.push(_metricLine('job_automation_jobs_completed_today', completedToday));
 
     lines.push('# HELP job_automation_jobs_running Current number of running jobs');
     lines.push('# TYPE job_automation_jobs_running gauge');
-    const jobsRunning = parseInt(await redis.get('automation:jobs_running') || '0');
+    const unackedJobs = parseMetricInt(await redis.hlen('unacked') || '0');
+    const jobsRunning = Math.max(
+      parseMetricInt(await redis.get('automation:jobs_running') || '0'),
+      unackedJobs,
+      parseMetricInt(activeBrowsers)
+    );
     lines.push(_metricLine('job_automation_jobs_running', jobsRunning));
 
     lines.push('# HELP job_automation_queue_total Total pending tasks across all queues');
@@ -655,37 +701,84 @@ app.post('/api/notify-application', async (req, res) => {
       return res.status(400).json({ error: 'No data provided' });
     }
     
-    let student = null;
-    if (data.studentId) {
-      student = await studentsCollection.findOne({ student_id: data.studentId });
+    // Normalize properties to standard snake_case database schema
+    const student_id = data.studentId || data.student_id || 'unknown';
+    const platform = (data.platform || '').toLowerCase().trim();
+    const job_id = data.job_id || data.jobId;
+    const job_url = data.jobUrl || data.job_url || '';
+    const job_title = data.jobTitle || data.job_title || data.role || 'N/A';
+    const company = data.company || 'N/A';
+    const status = normalizeStatus(data.status || 'pending');
+    const resume_variant = data.resumeVariant || data.resume_variant || '';
+    const resume_url = data.resumeUrl || data.resume_url || '';
+    const error_message = data.error || data.error_message || null;
+    
+    let applied_at = null;
+    if (data.appliedAt || data.applied_at) {
+      applied_at = new Date(data.appliedAt || data.applied_at);
+    } else if (status === 'applied') {
+      applied_at = new Date();
     }
-    const payload = toDashboardPayload({
-      ...data,
-      student_id: data.studentId,
-      job_title: data.jobTitle,
-      resume_variant: data.resumeVariant,
-      resume_url: data.resumeUrl,
-      job_url: data.jobUrl,
-      applied_at: data.appliedAt,
-    }, student);
 
-    // Save to MongoDB for persistence
-    const normalizedStatus = normalizeStatus(data.status || 'pending');
-    await applicationsCollection.insertOne({
-      ...payload,
-      status: normalizedStatus,
-      created_at: new Date(),
-    });
+    let student = null;
+    if (student_id && student_id !== 'unknown') {
+      student = await studentsCollection.findOne({ student_id });
+    }
+
+    // Build filter query for upsert to prevent duplicates
+    const filter = {
+      student_id,
+      platform,
+    };
+    if (job_id) {
+      filter.job_id = job_id;
+    } else if (job_url) {
+      filter.job_url = job_url;
+    } else {
+      filter.job_id = `not_specified_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    }
+
+    const updateDoc = {
+      student_id,
+      platform,
+      job_id: job_id || filter.job_id,
+      job_url,
+      job_title,
+      company,
+      status,
+      resume_variant,
+      resume_url,
+      error_message,
+      updated_at: new Date()
+    };
+    if (applied_at) {
+      updateDoc.applied_at = applied_at;
+    }
+
+    // Save/Update in MongoDB using upsert
+    await applicationsCollection.updateOne(
+      filter,
+      {
+        $setOnInsert: { created_at: new Date() },
+        $set: updateDoc
+      },
+      { upsert: true }
+    );
+
+    // Retrieve the updated document to emit consistent format to Socket.io clients
+    const updatedDoc = await applicationsCollection.findOne(filter);
+    const payload = toDashboardPayload(updatedDoc, student);
     
     // Emit to all connected clients
     emitApplicationUpdate(payload);
     
-    res.json({ status: 'success', message: 'Notification sent' });
+    res.json({ status: 'success', message: 'Notification processed' });
   } catch (error) {
     console.error('Error sending notification:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // ==================== WebSocket Events ====================
 
@@ -794,10 +887,10 @@ app.get('/api/automation/status', async (req, res) => {
       auto_stop: autoStop === 'true',
       last_toggle_time: lastToggleTime,
       last_start_time: lastStartTime,
-      jobs_running: parseInt(jobsRunning) || 0,
-      jobs_completed_today: parseInt(jobsCompletedToday) || 0,
+      jobs_running: parseMetricInt(jobsRunning),
+      jobs_completed_today: parseMetricInt(jobsCompletedToday),
       auto_off_time: autoOffTime || '23:59',
-      daily_schedule: dailySchedule || '06:00,11:00,17:00',
+      daily_schedule: dailySchedule || '06:00,11:00,17:00,20:00,22:30',
       workers: workerStatus ? {
         total: workerStatus.totalWorkers,
         running: workerStatus.runningWorkers,
@@ -902,8 +995,6 @@ app.post('/api/automation/toggle', async (req, res) => {
     } else {
       console.log('[API] STOP triggered - stopping workers...');
       
-      const jobsRunning = parseInt(await redis.get('automation:jobs_running') || '0', 10);
-      
       const stopResult = await dockerManager.stopWorkers();
       
       await redis.set('automation:main_switch', 'off');
@@ -962,7 +1053,7 @@ app.post('/api/automation/settings', async (req, res) => {
       message: 'Automation settings updated',
       settings: {
         auto_off_time: current_auto_off_time || '23:59',
-        daily_schedule: current_daily_schedule || '06:00,11:00,17:00',
+        daily_schedule: current_daily_schedule || '06:00,11:00,17:00,20:00,22:30',
         auto_enable: current_auto_enable === 'true'
       }
     });
@@ -1007,7 +1098,10 @@ app.post('/api/automation/run', async (req, res) => {
     const platforms       = req.body?.platforms || ['naukri', 'linkedin', 'foundit'];
     const schedule_name   = req.body?.schedule_name || 'manual-run';
 
-    await redis.set('automation:jobs_running', String(student_limit || 'all'));
+    await redis.set('automation:jobs_running', '0');
+    await redis.set('automation:jobs_queue', '1');
+    await redis.set('automation:beat_last_trigger_time', Date.now().toString());
+    await redis.set('automation:beat_last_schedule', schedule_name);
 
     // Build proper Celery v2 protocol message — workers running Celery 4+ require this format
     const taskMsg = buildCeleryMessage(
@@ -1019,7 +1113,7 @@ app.post('/api/automation/run', async (req, res) => {
 
     // Push to Redis key = queue name ('producer')
     // FIX: was 'celery producer' (space = wrong key) — now correctly 'producer'
-    await redis.rpush('producer', taskMsg);
+    await redis.lpush('producer', taskMsg);
 
     console.log(`[API] RUN triggered → students: ${student_limit || 'all'}, jobs: ${jobs_per_student}, platforms: ${platforms.join(', ')}`);
 

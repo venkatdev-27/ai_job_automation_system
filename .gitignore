@@ -27,6 +27,25 @@ logs/
 *~
 .DS_Store
 
+# Local job-automation scratch scripts and trigger payloads
+job_automation_system/node-api/check_apps.js
+job_automation_system/scratch/check_apps.py
+job_automation_system/scratch/check_linkedin.py
+job_automation_system/scratch/clean_student.py
+job_automation_system/scratch/clear_cooldown.py
+job_automation_system/scratch/fix_education.py
+job_automation_system/scratch/test_db_delete.py
+job_automation_system/scratch/test_single_resume.py
+job_automation_system/scratch/test_warmup.py
+job_automation_system/scratch/trigger_foundit_now.py
+job_automation_system/scratch/trigger_linkedin_now.py
+job_automation_system/scratch/trigger_test_sequentially.py
+job_automation_system/scratch/toggle_on.json
+job_automation_system/scratch/trigger.json
+
+# Generated resume test outputs
+ai_engine/resumes/student_4443c80f/java_backend_developer_test*
+
 # Python
 __pycache__/
 *.pyc

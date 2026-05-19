@@ -253,11 +253,11 @@ def run_recovery_beat(self) -> dict[str, Any]:
     10:30 PM recovery run - fills students still below daily cap.
     Reads wave_progress from Redis to target only incomplete students.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from services.wave_progress import get_incomplete_students
     from database import get_active_students
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     incomplete = get_incomplete_students("recovery-1030pm", today)
 
     if not incomplete:
