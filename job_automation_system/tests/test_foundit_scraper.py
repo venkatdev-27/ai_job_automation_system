@@ -9,7 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Setup environment for Docker test
-os.environ["MONGO_URI"] = "mongodb+srv://kosurivenky:venkyyamuna@cluster0.uhbfag1.mongodb.net/ai_bot_resumes?appName=Cluster0"
+os.environ["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb://localhost:27017/job_automation")
 os.environ["USE_CDP"] = "false"
 os.environ["PLAYWRIGHT_HEADLESS"] = "true"
 os.environ["IN_DOCKER"] = "true"

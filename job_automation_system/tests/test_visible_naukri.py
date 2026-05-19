@@ -30,7 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # MongoDB connection
-os.environ["MONGO_URI"] = os.environ.get("MONGO_URI", "mongodb+srv://kosurivenky:venkyyamuna@cluster0.uhbfag1.mongodb.net/ai_bot_resumes?appName=Cluster0")
+os.environ["MONGO_URI"] = os.environ.get("MONGO_URI", os.getenv("MONGO_URI", "mongodb://localhost:27017/job_automation"))
 os.environ["MONGO_DB"] = os.environ.get("MONGO_DB", "ai_bot_resumes")
 
 # Headless mode - force true in Docker/container

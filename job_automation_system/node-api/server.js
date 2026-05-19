@@ -1149,7 +1149,7 @@ app.post('/api/automation/clear-duplicates', async (req, res) => {
     
     // Also clear applications from MongoDB to get fresh runs
     const MongoClient = require('mongodb').MongoClient;
-    const mongoClient = new MongoClient(process.env.MONGO_URI || 'mongodb+srv://kosurivenky:venkyyamuna@cluster0.uhbfag1.mongodb.net/ai_bot_resumes?appName=Cluster0');
+    const mongoClient = new MongoClient(process.env.MONGO_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/job_automation');
     await mongoClient.connect();
     const db = mongoClient.db('ai_bot_resumes');
     

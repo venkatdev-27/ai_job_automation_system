@@ -1,7 +1,8 @@
+import os
 from pymongo import MongoClient
 
 # SRV URI worked for DNS - just needs more time for primary election
-uri = "mongodb+srv://kosurivenky:venkyyamuna@cluster0.uhbfag1.mongodb.net/ai_bot_resumes?appName=Cluster0"
+uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/job_automation")
 
 print("Connecting with 15s timeout (cluster may be waking up)...")
 client = MongoClient(uri, serverSelectionTimeoutMS=15000)

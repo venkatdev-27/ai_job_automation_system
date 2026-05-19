@@ -1,5 +1,5 @@
 import os
-os.environ['MONGO_URI'] = 'mongodb://kosurivenky:venkyyamuna@ac-rn1zxqy-shard-00-00.uhbfag1.mongodb.net:27017,ac-rn1zxqy-shard-00-01.uhbfag1.mongodb.net:27017,ac-rn1zxqy-shard-00-02.uhbfag1.mongodb.net:27017/?ssl=true&replicaSet=atlas-rmuasr-shard-0&authSource=admin&appName=JobAutomation'
+os.environ['MONGO_URI'] = os.getenv("MONGO_URI", "mongodb://localhost:27017/job_automation")
 
 import sys
 sys.path.insert(0, '/app')

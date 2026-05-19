@@ -1,7 +1,7 @@
 const { MongoClient } = require('mongodb');
 
 async function clearOldApps() {
-  const client = new MongoClient('mongodb+srv://kosurivenky:venkyyamuna@cluster0.uhbfag1.mongodb.net/ai_bot_resumes?appName=Cluster0');
+  const client = new MongoClient(process.env.MONGO_URI || 'mongodb://localhost:27017/job_automation');
   await client.connect();
   const db = client.db('ai_bot_resumes');
   
