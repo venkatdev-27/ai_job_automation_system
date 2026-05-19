@@ -1,0 +1,216 @@
+services:
+  # ==================== Infrastructure ====================
+  redis:
+    image: redis:7-alpine
+    container_name: job-automation-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - job-automation-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # Chrome CDP Container (Reduced for 8GB RAM)
+  chrome-cdp:
+    image: browserless/chrome:latest
+    container_name: job-automation-chrome-cdp
+    ports:
+      - "3000:3000"
+      - "9222:9222"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=3
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=10
+      - DEBUG=false
+      - PREVENT_AUTOLAUNCH=true
+    volumes:
+      - ./chrome_profile:/tmp/browserless
+    restart: unless-stopped
+    networks:
+      - job-automation-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # AI Engine (Exposed Port 8000)
+  ai-engine:
+    build:
+      context: ../ai_engine
+      dockerfile: Dockerfile
+    container_name: job-automation-ai-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - IN_DOCKER=true
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    networks:
+      - job-automation-network
+    volumes:
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Node API Server
+  node-api:
+    build:
+      context: ./node-api
+    container_name: job-automation-node-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - DOCKER_COMPOSE_PATH=/app/job_automation_system
+      - DOCKER_COMPOSE_FILE=docker-compose-test.yml
+      - DOCKER_PROJECT_NAME=automation
+    depends_on:
+      - redis
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app/job_automation_system
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ==================== Celery Workers (Optimized for 8GB RAM) ====================
+
+  celery-naukri-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-naukri-1
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q naukri -c 1 --loglevel=info
+    environment: &celery-env
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - CDP_URL=http://chrome-cdp:3000
+      - USE_CDP=true
+    depends_on:
+      - redis
+      - chrome-cdp
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+
+  celery-linkedin-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-linkedin-1
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q linkedin -c 1 --loglevel=info
+    environment: *celery-env
+    depends_on:
+      - redis
+      - chrome-cdp
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+
+  celery-foundit-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-foundit-1
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q foundit -c 1 --loglevel=info
+    environment: *celery-env
+    depends_on:
+      - redis
+      - chrome-cdp
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    deploy:
+      resources:
+        limits:
+          memory: 600M
+
+  celery-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-producer
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q producer,warmup -c 2 --loglevel=info
+    environment: *celery-env
+    depends_on:
+      - redis
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./temp_resumes:/app/temp_resumes
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-beat
+    restart: unless-stopped
+    command: celery -A celery_app.app beat --loglevel=info
+    environment: *celery-env
+    depends_on:
+      - redis
+      - celery-producer
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+networks:
+  job-automation-network:
+    driver: bridge

@@ -1,0 +1,123 @@
+# Prometheus Configuration - Job Automation System
+# ==============================================================================
+# Usage: Copy to VPS at /opt/job-automation/prometheus.yml
+# Or mount via docker-compose: ./prometheus.yml:/etc/prometheus/prometheus.yml
+# ==============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'job-automation'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alertmanagers:
+#   - static_configs:
+#       - targets:
+#         - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts.yml"
+
+# ==============================================================================
+# SCRAPE CONFIGURATIONS
+# ==============================================================================
+
+scrape_configs:
+  # ==============================================================================
+  # NODE-API METRICS
+  # ==============================================================================
+  - job_name: 'node-api'
+    static_configs:
+      - targets: ['node-api:5000']
+        labels:
+          service: 'node-api'
+          component: 'api'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    honor_labels: true
+
+  # ==============================================================================
+  # AI-ENGINE METRICS
+  # ==============================================================================
+  - job_name: 'ai-engine'
+    static_configs:
+      - targets: ['ai-engine:8000']
+        labels:
+          service: 'ai-engine'
+          component: 'llm'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+
+  # ==============================================================================
+  # CADVISOR - CONTAINER METRICS
+  # ==============================================================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          component: 'monitoring'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+
+  # ==============================================================================
+  # PROMETHEUS SELF-MONITORING
+  # ==============================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+  # ==============================================================================
+  # REDIS METRICS (via Redis Exporter - optional)
+  # ==============================================================================
+  # Uncomment if you add redis-exporter container
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+  #         component: 'broker'
+
+  # ==============================================================================
+  # FLOWER - CELERY METRICS
+  # ==============================================================================
+  - job_name: 'flower'
+    static_configs:
+      - targets: ['flower:5555']
+        labels:
+          service: 'flower'
+          component: 'monitoring'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+
+  # ==============================================================================
+  # DOCKER DAEMON METRICS
+  # ==============================================================================
+  # Enable in Docker Desktop > Settings > Metrics > "Enable metrics"
+  # Uncomment only if Docker metrics exporter is running on port 9323
+  # - job_name: 'docker'
+  #   static_configs:
+  #     - targets: ['host.docker.internal:9323']
+  #       labels:
+  #         service: 'docker'
+  #         component: 'infrastructure'
+  #   scrape_interval: 30s
+
+# ==============================================================================
+# REMOTE WRITE (Optional - for long-term storage)
+# ==============================================================================
+
+# remote_write:
+#   - url: http://your-remote-storage/api/v1/write
+#     basic_auth:
+#       username: your-username
+#       password: your-password

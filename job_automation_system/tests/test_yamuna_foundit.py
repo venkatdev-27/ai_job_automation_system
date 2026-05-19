@@ -1,0 +1,187 @@
+import logging
+import os
+import sys
+from pathlib import Path
+
+# Setup logging early
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Add project root to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Force localhost Redis for host-machine runs before importing app/settings.
+LOCAL_BROKER_URL = os.environ.get("TEST_CELERY_BROKER_URL", "redis://localhost:6379/0")
+LOCAL_RESULT_BACKEND = os.environ.get("TEST_CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+os.environ["REDIS_HOST"] = "localhost"
+os.environ["REDIS_PORT"] = os.environ.get("REDIS_PORT", "6379") or "6379"
+os.environ["CELERY_BROKER_URL"] = LOCAL_BROKER_URL
+os.environ["CELERY_RESULT_BACKEND"] = LOCAL_RESULT_BACKEND
+
+from config import settings  # noqa: E402
+from database import get_student  # noqa: E402
+from celery_app.app import app  # noqa: E402
+
+
+DEFAULT_STUDENT_ID = os.environ.get("TEST_STUDENT_ID", "student_2b4359c4")
+DEFAULT_MAX_JOBS = int(os.environ.get("TEST_MAX_JOBS", "3"))
+RUN_AI_PREFLIGHT = os.environ.get("TEST_AI_PREFLIGHT", "false").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _check_redis(url: str, name: str) -> None:
+    import redis
+    client = redis.Redis.from_url(url, socket_connect_timeout=2, socket_timeout=2)
+    client.ping()
+    logger.info("%s connection successful: %s", name, url)
+
+
+def _check_ai_components() -> bool:
+    """Validate AI dependencies are importable/initializable."""
+    logger.info("Running AI components preflight for Foundit...")
+    checks = []
+
+    try:
+        from ai_engine.llm_answers import LLMAnswers
+        _ = LLMAnswers(settings, logger)
+        checks.append(("LLMAnswers", True, "initialized"))
+    except Exception as exc:
+        checks.append(("LLMAnswers", False, str(exc)))
+
+    try:
+        from utils.ai_extractor import get_ai_extractor
+        extractor = get_ai_extractor()
+        checks.append(("AIExtractor", extractor is not None, "loaded" if extractor else "returned None"))
+    except Exception as exc:
+        checks.append(("AIExtractor", False, str(exc)))
+
+    try:
+        from utils.resume_selector import ResumeSelector
+        _ = ResumeSelector("student_2b4359c4")
+        checks.append(("ResumeSelector", True, "initialized"))
+    except Exception as exc:
+        checks.append(("ResumeSelector", False, str(exc)))
+
+    try:
+        from utils.skill_scorer import SkillScorer
+        _ = SkillScorer()
+        checks.append(("SkillScorer", True, "initialized"))
+    except Exception as exc:
+        checks.append(("SkillScorer", False, str(exc)))
+
+    try:
+        from rag_engine.rag_engine import GroqLLM
+        _ = GroqLLM()
+        checks.append(("GroqLLM", True, "initialized"))
+    except Exception as exc:
+        checks.append(("GroqLLM", False, str(exc)))
+
+    try:
+        from rag_engine.rag_resume_generator import get_rag_resume_generator
+        checks.append(("RAGResumeGenerator", callable(get_rag_resume_generator), "available"))
+    except Exception as exc:
+        checks.append(("RAGResumeGenerator", False, str(exc)))
+
+    all_ok = True
+    for name, ok, detail in checks:
+        if ok:
+            logger.info("AI check OK - %s (%s)", name, detail)
+        else:
+            all_ok = False
+            logger.error("AI check FAIL - %s (%s)", name, detail)
+    return all_ok
+
+
+def trigger_yamuna_foundit_test():
+    student_id = DEFAULT_STUDENT_ID
+    platform = "foundit"
+
+    broker_url = os.environ["CELERY_BROKER_URL"]
+    result_url = os.environ["CELERY_RESULT_BACKEND"]
+
+    logger.info("Using broker URL: %s", broker_url)
+    logger.info("Using result backend URL: %s", result_url)
+
+    try:
+        _check_redis(broker_url, "Broker Redis")
+        _check_redis(result_url, "Result backend Redis")
+    except Exception as exc:
+        logger.error("Could not connect to Redis using configured URLs: %s", exc)
+        logger.info("Ensure your Redis container/service is running and reachable.")
+        return
+
+    # Ensure Celery uses these URLs even if it was imported earlier. Disable connection pooling to avoid Windows/WSL 10054 errors.
+    app.conf.update(
+        broker_url=broker_url, 
+        result_backend=result_url,
+        broker_pool_limit=None
+    )
+
+    logger.info("Settings broker URL: %s", settings.celery_broker_url)
+    logger.info("Settings result backend URL: %s", settings.celery_result_backend)
+    logger.info("App broker URL: %s", app.conf.broker_url)
+    logger.info("App result backend URL: %s", app.conf.result_backend)
+
+    if RUN_AI_PREFLIGHT and not _check_ai_components():
+        logger.error("AI preflight failed. Skipping Foundit task enqueue.")
+        return
+
+    student = get_student(student_id)
+    if not student:
+        logger.error("Student %s not found!", student_id)
+        return
+
+    logger.info("Found student: %s", student.name)
+
+    # DYNAMIC: Use JobGenerator to create URLs from ALL student skills
+    from producer.job_generator import get_job_urls
+
+    # Get ALL jobs (use all skills)
+    job_urls = get_job_urls(
+        student=student,
+        platform=platform,
+        max_jobs=DEFAULT_MAX_JOBS,
+    )
+
+    if not job_urls:
+        logger.error("No job URLs generated from student profile!")
+        return
+
+    logger.info("Generated %d job URLs from student profile", len(job_urls))
+
+    # Get primary URL and resume variant
+    job_url = job_urls[0].get("url", "") if job_urls else ""
+    resume_variant = job_urls[0].get("resume_variant", "backend") if job_urls else "backend"
+
+    logger.info("DYNAMIC: Primary job URL: %s", job_url)
+    logger.info("DYNAMIC: Resume variant: %s", resume_variant)
+    logger.info("DYNAMIC: Student skills: %s", student.skills[:10] if student.skills else "None")
+
+    task_name = "tasks.foundit_task.apply_to_job"
+
+    logger.info("Queuing task for %s on %s...", student.name, platform)
+    try:
+        result = app.send_task(
+            task_name,
+            args=[student_id, job_url, resume_variant],
+            kwargs={"job_batch": job_urls},
+            queue="foundit",
+        )
+    except Exception as exc:
+        logger.exception("Task enqueue failed: %s", exc)
+        return
+
+    logger.info("Task submitted. ID: %s", result.id)
+    logger.info("DYNAMIC: Using resume_variant: %s", resume_variant)
+    print(f"\nTask queued successfully for {student_id}.")
+    print(f"Task ID: {result.id}")
+    print(f"Platform: {platform}")
+    print(f"Resume variant: {resume_variant}")
+    print(f"Job URL: {job_url}")
+    print(f"Total jobs queued in batch: {len(job_urls)}")
+    print("Check logs with: docker logs -f celery-foundit-1")
+
+
+if __name__ == "__main__":
+    trigger_yamuna_foundit_test()

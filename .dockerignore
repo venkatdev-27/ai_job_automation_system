@@ -1,0 +1,8 @@
+# Exclude everything by default
+*
+
+# Only include job_automation_system
+job_automation_system/
+
+# Only include ai_engine (if needed by compose)
+# ai_engine/

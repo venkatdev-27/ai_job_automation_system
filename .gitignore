@@ -1,0 +1,68 @@
+# ==============================================================================
+# Job Automation System - Root .gitignore
+# ==============================================================================
+
+# Environment files (NEVER COMMIT)
+.env
+.env.production
+.env.production.local
+.env.local
+.env.*.local
+
+# API keys
+*.key
+*.pem
+*.crt
+
+# Data directories
+chrome_profile/
+temp_resumes/
+chroma_db/
+sessions/
+logs/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# ==============================================================================
+# EXCEPTIONS (ALLOW)
+# ==============================================================================
+
+# Templates
+!.env.example
+!.env.production.example
+
+# Dashboard
+!admin-dashboard/.gitignore
+# Legacy and Backup Data
+deprecated_backup/
+storage/
+ai_job_auto_apply/chrome_profile/
+
+chromium_profile/
+firefox_profile/
+
+.env.*
+

@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  ai-engine:
+    build: ../ai_engine
+    image: job-automation-ai-engine:latest
+    container_name: job-automation-ai-engine
+    command: uvicorn ai_engine.api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - job-automation-network
+    volumes:
+      - ../ai_engine:/app/ai_engine
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+      - ../chroma_db:/app/ai_engine/cache/chroma_db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: job-automation-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Chrome CDP for test
+  chrome-cdp:
+    image: browserless/chrome:latest
+    container_name: job-automation-chrome-cdp
+    ports:
+      - "3000:3000"
+      - "9222:9222"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=5
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=10
+      - DEBUG=false
+      - PREVENT_AUTOLAUNCH=true
+    volumes:
+      - ./chrome_profile:/tmp/browserless
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery-naukri-test:
+    build: .
+    image: job-automation-celery-naukri-test:latest
+    container_name: celery-naukri-test
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q naukri -c 3 -O fair --loglevel=info --hostname=naukri-test@%h
+    environment:
+      - CELERY_BROKER_URL=redis://job-automation-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://job-automation-redis:6379/1
+      - REDIS_HOST=job-automation-redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - PLAYWRIGHT_BROWSER=chromium
+      - USE_CDP=true
+      - CDP_URL=http://chrome-cdp:3000
+      - RESUMES_DIR=/app/ai_engine/resumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    depends_on:
+      - redis
+      - chrome-cdp
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  celery-linkedin-test:
+    build: .
+    image: job-automation-celery-linkedin-test:latest
+    container_name: celery-linkedin-test
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q linkedin -c 3 -O fair --loglevel=info --hostname=linkedin-test@%h
+    environment:
+      - CELERY_BROKER_URL=redis://job-automation-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://job-automation-redis:6379/1
+      - REDIS_HOST=job-automation-redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    depends_on:
+      - redis
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  celery-foundit-test:
+    build: .
+    image: job-automation-celery-foundit-test:latest
+    container_name: celery-foundit-test
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q foundit -c 3 -O fair --loglevel=info --hostname=foundit-test@%h
+    environment:
+      - CELERY_BROKER_URL=redis://job-automation-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://job-automation-redis:6379/1
+      - REDIS_HOST=job-automation-redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    depends_on:
+      - redis
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  celery-producer-test:
+    build: .
+    image: job-automation-celery-producer-test:latest
+    container_name: celery-producer-test
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q producer,warmup -c 2 -O fair --loglevel=info --hostname=producer-test@%h
+    environment:
+      - CELERY_QUEUE=producer,warmup
+      - CELERY_BROKER_URL=redis://job-automation-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://job-automation-redis:6379/1
+      - REDIS_HOST=job-automation-redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  job-automation-network:
+    driver: bridge

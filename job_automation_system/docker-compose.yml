@@ -1,0 +1,763 @@
+services:
+  # ==================== Infrastructure ====================
+
+  # Using cloud MongoDB - skip local mongodb service
+  # mongodb:
+  #   image: mongo:7
+  #   container_name: job-automation-mongo-v2
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+  #   networks:
+  #     - job-automation-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: job-automation-redis-v2
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Chrome CDP Container (10 concurrent sessions)
+  chrome-cdp:
+    image: browserless/chrome:latest
+    container_name: job-automation-chrome-cdp-v2
+    ports:
+      - "3000:3000"
+      - "9222:9222"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=20
+      - DEBUG=false
+      - PREVENT_AUTOLAUNCH=true
+    volumes:
+      - ./chrome_profile:/tmp/browserless
+    restart: unless-stopped
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/pressure" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # ==================== Celery Workers ====================
+
+  # Naukri Workers (2 workers, 2 concurrency each = 4 total)
+  celery-naukri-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-naukri-1-v2
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q naukri -c 2 -O fair --loglevel=info --hostname=naukri-1@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+      chrome-cdp:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=naukri
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - BROWSER_CONCURRENCY_NAUKRI=2
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+      - CDP_URL=http://chrome-cdp:3000
+      - USE_CDP=true
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  celery-naukri-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-naukri-2-v2
+    restart: unless-stopped
+    command: celery -A celery_app.app worker -Q naukri -c 2 -O fair --loglevel=info --hostname=naukri-2@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+      chrome-cdp:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=naukri
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - BROWSER_CONCURRENCY_NAUKRI=2
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+      - CDP_URL=http://chrome-cdp:3000
+      - USE_CDP=true
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  # LinkedIn Workers (2 workers, 2 concurrency each = 4 total)
+  celery-linkedin-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-linkedin-1-v2
+    command: celery -A celery_app.app worker -Q linkedin -c 2 -O fair --loglevel=info --hostname=linkedin-1@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=linkedin
+      - PROFILE_NAMESPACE=linkedin
+      - LINKEDIN_USE_CDP=false
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  celery-linkedin-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-linkedin-2-v2
+    command: celery -A celery_app.app worker -Q linkedin -c 2 -O fair --loglevel=info --hostname=linkedin-2@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=linkedin
+      - PROFILE_NAMESPACE=linkedin
+      - LINKEDIN_USE_CDP=false
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  # FoundIT Workers (2 workers, 2 concurrency each = 4 total)
+  celery-foundit-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-foundit-1-v2
+    command: celery -A celery_app.app worker -Q foundit -c 2 -O fair --loglevel=info --hostname=foundit-1@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=foundit
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  celery-foundit-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-foundit-2-v2
+    command: celery -A celery_app.app worker -Q foundit -c 2 -O fair --loglevel=info --hostname=foundit-2@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=foundit
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=20
+      - MAX_PARALLEL_BROWSERS=6
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+
+  # ==================== Celery Beat Scheduler ====================
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-beat-v2
+    command: celery -A celery_app.app beat --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_TASK_SCOPE=beat
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - job-automation-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ==================== Warmup Worker (On-demand) ====================
+
+  celery-warmup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-warmup-v2
+    command: celery -A celery_app.app worker -Q warmup -c 1 --loglevel=info --hostname=warmup@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=warmup
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # ==================== Producer Worker (On-demand Platform Runs) ====================
+
+  celery-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-producer-v2
+    command: celery -A celery_app.app worker -Q producer -c 2 --loglevel=info --hostname=producer@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=producer
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==================== Student Wave Worker (Production Orchestration) ====================
+
+  celery-student-wave:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery-student-wave-v2
+    command: celery -A celery_app.app worker -Q student_wave -c 6 -O fair --loglevel=info --hostname=student-wave@%h
+    depends_on:
+      redis:
+        condition: service_healthy
+      chrome-cdp:
+        condition: service_healthy
+    environment:
+      - CELERY_QUEUE=student_wave
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - CDP_URL=http://chrome-cdp:3000
+      - USE_CDP=true
+      - LINKEDIN_USE_CDP=false
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=5400
+      - CELERY_TASK_SOFT_TIME_LIMIT=4800
+      - WORKER_PREFETCH_MULTIPLIER=1
+      - WORKER_MAX_TASKS_PER_CHILD=10
+      - MAX_PARALLEL_BROWSERS=6
+      - BROWSER_CONCURRENCY_FOUNDIT=3
+      - BROWSER_CONCURRENCY_NAUKRI=2
+      - BROWSER_CONCURRENCY_LINKEDIN=1
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 8G
+        reservations:
+          memory: 4G
+
+  # ==================== API Server (Node.js) ====================
+
+  api:
+    build:
+      context: ./node-api
+      dockerfile: Dockerfile
+    container_name: job-automation-api-v2
+    ports:
+      - "5000:5000"
+    command: node server.js
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - REDIS_HOST=redis
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - NODE_ENV=production
+      - DOCKER_COMPOSE_PATH=/app/job_automation_system
+      - DOCKER_COMPOSE_FILE=docker-compose.yml
+      - DOCKER_PROJECT_NAME=job_automation_system
+    volumes:
+      - ./node-api:/app
+      - /app/node_modules
+      - ./logs:/app/logs
+      - .:/app/job_automation_system
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==================== AI Engine (Port 8000) ====================
+
+  ai-engine:
+    build:
+      context: ../ai_engine
+      dockerfile: Dockerfile
+    container_name: job-automation-ai-engine-v2
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    environment:
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - PROJECT_ROOT=/app
+      - CONTAINER_PROJECT_ROOT=/app
+      - HOST_PROJECT_ROOT=${HOST_PROJECT_ROOT:-D:/ai-bot-resumes}
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+      - LLM_MAX_CONCURRENCY=${LLM_MAX_CONCURRENCY:-8}
+    working_dir: /app
+    command: uvicorn ai_engine.api.main:app --host 0.0.0.0 --port 8000
+    networks:
+      - job-automation-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  # ==================== Monitoring ====================
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-automation-flower-v2
+    ports:
+      - "5555:5555"
+    command: celery -A celery_app.app flower --port=5555
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5555"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: job-automation-prometheus-v2
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: job-automation-grafana-v2
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/dashboard.json:/var/lib/grafana/dashboards/job-automation.json
+      - ./monitoring/grafana/provisioning/datasources/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./monitoring/grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  admin-dashboard:
+    container_name: job-automation-admin-dashboard-v2
+    build:
+      context: ../admin-dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
+    ports:
+      - "5174:80"
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ==================== Producer (Run Once) ====================
+
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-automation-producer-v2
+    command: python producer/producer.py --students=30 --jobs=13 --platforms=naukri,linkedin,foundit
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - API_URL=http://api:5000
+      - LOCAL_API_URL=${LOCAL_API_URL:-http://ai-engine:8000}
+      - PLAYWRIGHT_HEADLESS=${PLAYWRIGHT_HEADLESS}
+      - CELERY_TASK_TIME_LIMIT=3600
+      - CELERY_TASK_SOFT_TIME_LIMIT=3000
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_ENGINE_ENABLED=${AI_ENGINE_ENABLED:-true}
+    volumes:
+      - ./logs:/app/logs
+      - ../temp_resumes:/app/temp_resumes
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    networks:
+      - job-automation-network
+    profiles:
+      - once
+
+volumes:
+  redis_data:
+  mongo_data:
+  mongo_config:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  job-automation-network:
+    external: true
+    name: job_automation_system_job-automation-network

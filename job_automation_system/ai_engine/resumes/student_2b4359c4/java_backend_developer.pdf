@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Calibri', 'Arial', sans-serif;
+    font-size: 10.6pt;
+    line-height: 1.25;
+    color: #111111;
+    margin: 0;
+    padding: 0.2in 0.5in 0.2in 0.5in;
+    max-width: 8.27in;
+  }
+  h1, h2, h3, p, ul, li, strong, a {
+    font-family: 'Calibri', sans-serif;
+    color: #111111;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    clear: both;
+  }
+  a { color: #111111; display: inline-block; width: auto; clear: none; }
+  strong { display: inline; width: auto; clear: none; }
+  li { display: list-item; width: auto; clear: none; }
+  h1 {
+    font-weight: 700;
+  }
+  h2 {
+    margin: 15px 0 6px 0;
+    font-size: 12.0pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 1.5px solid #111111;
+    padding-bottom: 2px;
+  }
+  h3 {
+    margin: 10px 0 2px 0;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+  ul {
+    margin: 0 0 10px 18px;
+    padding: 0;
+    display: block;
+    width: 100%;
+  }
+  li {
+    margin: 0 0 4px 0;
+    text-align: justify;
+  }
+</style>
+</head>
+<body>
+    
+        <div style="text-align: center; margin-bottom: 5px;">
+            <h1 style="margin: 0; font-size: 16.1pt; text-transform: uppercase; font-family: 'Calibri', sans-serif;">Veera Venkata Satyanarayana Kosuri</h1>
+            <div style="margin-top: 2px; font-size: 14pt; font-weight: bold; color: #333;">Java Backend Developer</div>
+            <div style="margin-top: 4px; font-size: 10pt; color: #555;">mailto:kosurivenky50@gmail.com | +91 7013269473 | Hyderabad</div>
+            <hr style="border: 0; border-top: 1.5px solid #111; margin: 10px 0 12px 0;">
+        </div>
+        
+    <h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROFESSIONAL SUMMARY</h2>
+Java Backend Developer with expertise in Java, JavaScript, TypeScript, and Python, engineered scalable solutions.
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EDUCATION</h2>
+<p>B.Sc Computer Science, KBN College, 2022 – 2025, CGPA: 8.5</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">TECHNICAL SKILLS</h2>
+<p><strong>Programming Languages:</strong> Java, Python, JavaScript, TypeScript, Spring Boot, React.js, Node.js, Express.js, HTML 5, CSS 3, OOPS</p>
+<p><strong>Web Technologies:</strong> React, Redux, Tailwind CSS, Postman, Docker</p>
+<p><strong>Databases:</strong> SQL, MongoDB</p>
+<p><strong>Tools & Technologies:</strong> Git, GitHub, Jira, JWT Authentication</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EXPERIENCE</h2>
+<h3>MERN Full Stack Intern | BRN Infotech | Aug 2025 – Jan 2026</h3>
+<ul>
+  <li>Conducted MERN stack development with REST APIs, CRUD operations using MongoDB and.</li>
+  <li>Refreshed real-time e-commerce, chat, AI chatbot, and resume scanner with secure JWT.</li>
+  <li>Calibrated containerized applications using Docker and streamlined deployments with GitHub Actions CI/CD,.</li>
+</ul>
+<h3>Production Trainee | TATA ELECTRONICS | Apr 2025 – Jun 2025</h3>
+<ul>
+  <li>Coordinated production monitoring and quality checks in electronics manufacturing at Tata Electronics,.</li>
+  <li>Automated record-keeping and safety protocols, streamlining production workflow by 30% and reducing.</li>
+  <li>Conceptualized and implemented process improvements, resulting in 25% increase in production efficiency.</li>
+</ul>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROJECTS</h2>
+<h3>Luxemarket E-Commerce Platform</h3>
+<p><strong>Tech Stack:</strong> React, Node.js, Express, MongoDB, Redux, Docker</p>
+<ul>
+  <li>Leveraged MERN stack to build a scalable e-commerce platform with a comprehensive.</li>
+  <li>Allied with technical expertise to optimize Express routes, achieving a 25% improvement.</li>
+  <li>Introduced secure JWT authentication, reusable UI components, and Docker-based deployment, streamlining development.</li>
+</ul>
+<h3>ChatSphere Real-Time Scalable Chat Application</h3>
+<p><strong>Tech Stack:</strong> React, Node.js, Express, MongoDB, WebSockets, Redux, Redis</p>
+<ul>
+  <li>Elevated real-time MERN chat platform performance using WebSockets and Redis, achieving <50ms.</li>
+  <li>Balanced concurrent user traffic with scalable REST APIs and Redux-based state management,.</li>
+  <li>Conserved system resources by accelerating chat delivery by 35% through optimized APIs,.</li>
+</ul>
+<h3>ResumeIQ – AI & ATS Resume Scanner</h3>
+<p><strong>Tech Stack:</strong> React, Node.js, Express, MongoDB, Redux, Multer, AI APIs, Docker</p>
+<ul>
+  <li>Leveraged machine learning algorithms to build an AI-powered ATS scorer and resume.</li>
+  <li>Evaluated and integrated Multer for secure file uploads, streamlining backend processing for.</li>
+  <li>Engineered REST APIs using Python Flask and Docker, reducing latency by 40%.</li>
+</ul>
+</body>
+</html>

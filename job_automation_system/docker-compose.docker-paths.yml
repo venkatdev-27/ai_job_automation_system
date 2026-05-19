@@ -1,0 +1,139 @@
+# Docker Compose Override - For running in Docker/Linux
+# Copy this to docker-compose.override.yml or use with -f flag
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.docker-paths.yml up
+
+services:
+  # ==================== Celery Workers ====================
+  # All workers need correct Docker paths
+  
+  celery-naukri-1:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-naukri-2:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-linkedin-1:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-linkedin-2:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-foundit-1:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-foundit-2:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-warmup:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine
+
+  celery-beat:
+    environment:
+      - IN_DOCKER=true
+
+  celery-producer:
+    environment:
+      - CHROME_PROFILE_DIR=/app/chrome_profile
+      - RESUMES_DIR=/app/ai_engine/resumes
+      - TEMP_RESUMES_DIR=/app/temp_resumes
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SESSIONS_DIR=/app/sessions
+      - IN_DOCKER=true
+    volumes:
+      - ./logs:/app/logs
+      - ./chrome_profile:/app/chrome_profile
+      - ./resumes:/app/resumes
+      - ./sessions:/app/sessions
+      - ./chroma_db:/app/chroma_db
+      - ../ai_engine:/app/ai_engine

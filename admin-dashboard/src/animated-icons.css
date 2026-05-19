@@ -1,0 +1,27 @@
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50%, 70%, 90% { transform: rotate(10deg); }
+  20%, 40%, 60%, 80% { transform: rotate(-10deg); }
+}
+
+@keyframes rotate-ccw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+.animate-bell-shake {
+  animation: bell-shake 0.5s ease-in-out;
+}
+
+.animate-rotate-ccw {
+  animation: rotate-ccw 1s ease-in-out;
+}

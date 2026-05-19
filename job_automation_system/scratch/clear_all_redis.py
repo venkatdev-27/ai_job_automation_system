@@ -1,0 +1,18 @@
+import os
+import sys
+sys.path.insert(0, 'D:/ai-bot-resumes/job_automation_system')
+os.environ['REDIS_HOST'] = 'localhost'
+
+import redis
+r = redis.Redis(host='localhost', port=6379)
+keys = r.keys('idemp*')
+print(f'Found {len(keys)} idemp keys')
+for k in keys:
+    print(f'  Deleting: {k}')
+    r.delete(k)
+print(f'Deleted {len(keys)} keys')
+
+# Clear celery queues too
+for q in ['celery', 'celery naukri', 'celery linkedin', 'celery foundit']:
+    r.delete(q)
+print('Cleared queues')

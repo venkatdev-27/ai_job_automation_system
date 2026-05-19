@@ -1,0 +1,198 @@
+# Prometheus Alert Rules - Job Automation System
+# ==============================================================================
+
+groups:
+  # ==============================================================================
+  # CONTAINER HEALTH ALERTS
+  # ==============================================================================
+
+  - name: container_health
+    interval: 30s
+    rules:
+      - alert: ContainerDown
+        expr: up{job=~"node-api|ai-engine"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: health
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 2 minutes"
+          runbook_url: "https://docs.example.com/runbooks/container-down"
+
+      - alert: ContainerRestartingTooMuch
+        expr: rate(container_restart_count[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: health
+        annotations:
+          summary: "Container {{ $labels.name }} restarting too frequently"
+          description: "Container has restarted {{ $value }} times in the last 5 minutes"
+
+  # ==============================================================================
+  # JOB AUTOMATION ALERTS
+  # ==============================================================================
+
+  - name: job_automation
+    interval: 60s
+    rules:
+      - alert: HighJobFailureRate
+        expr: rate(job_automation_tasks_total{status="failed"}[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          category: jobs
+        annotations:
+          summary: "High job failure rate"
+          description: "Failure rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://docs.example.com/runbooks/high-failure-rate"
+
+      - alert: DailyJobQuotaReached
+        expr: job_automation_jobs_completed_today >= 100
+        for: 1m
+        labels:
+          severity: info
+          category: jobs
+        annotations:
+          summary: "Daily job quota reached"
+          description: "{{ $value }} jobs completed today"
+
+      - alert: RedisQueueBacklog
+        expr: job_automation_queue_total > 100
+        for: 10m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "Redis queue backlog detected"
+          description: "Queue has {{ $value }} pending tasks"
+
+  # ==============================================================================
+  # INFRASTRUCTURE ALERTS
+  # ==============================================================================
+
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High CPU usage on {{ $labels.name }}"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High memory usage on {{ $labels.name }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: OOMKiller
+        expr: rate(container_oom_events_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "Out of Memory killed container {{ $labels.name }}"
+          description: "Container was killed by OOM killer"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value | printf \"%.0f\" }}% disk space remaining on root filesystem"
+
+  # ==============================================================================
+  # PLATFORM-SPECIFIC ALERTS
+  # ==============================================================================
+
+  - name: platforms
+    interval: 60s
+    rules: []
+
+  # ==============================================================================
+  # AI ENGINE ALERTS
+  # ==============================================================================
+
+  - name: ai_engine
+    interval: 60s
+    rules:
+      - alert: AIEngineSlowResponse
+        expr: rate(ai_engine_request_duration_seconds_sum[5m]) / rate(ai_engine_request_duration_seconds_count[5m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: ai
+        annotations:
+          summary: "AI Engine response time high"
+          description: "Average response time is {{ $value }}s"
+
+      - alert: AIEngineHighErrorRate
+        expr: rate(ai_engine_errors_total[5m]) / rate(ai_engine_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: ai
+        annotations:
+          summary: "AI Engine error rate high"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+  # ==============================================================================
+  # LOCK & IDEMPOTENCY HEALTH ALERTS
+  # ==============================================================================
+
+  - name: lock_health
+    interval: 60s
+    rules:
+      - alert: IdempotencyKeyClearFailed
+        expr: sum by (platform, student_id) (rate(job_automation_idemp_clear_failures_total[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: idempotency
+        annotations:
+          summary: "Failed to clear idempotency key"
+          description: "Idempotency key clear failed for {{ $labels.platform }}/{{ $labels.student_id }}. Next retry will force-clear."
+
+      - alert: SessionKeyClearFailed
+        expr: sum by (platform, student_id) (rate(job_automation_session_clear_failures_total[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+          category: idempotency
+        annotations:
+          summary: "Failed to clear session key"
+          description: "Session key clear failed for {{ $labels.platform }}/{{ $labels.student_id }}. Student may be blocked."
+
+      - alert: CircuitBreakerOpenLong
+        expr: job_automation_circuit_state == 1
+        for: 5m
+        labels:
+          severity: warning
+          category: circuit_breaker
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.platform }} for more than 5 minutes"
+          description: "Platform {{ $labels.platform }} circuit breaker has been open for 5+ minutes. Check for persistent failures."
+
+      - alert: RateLimiterTimeout
+        expr: sum by (platform) (rate(job_automation_rate_limit_timeouts_total[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: rate_limiter
+        annotations:
+          summary: "Rate limiter timeouts on {{ $labels.platform }}"
+          description: "Rate limiter hit timeout {{ $value }} times in 5 minutes. Redis may be slow or unavailable."

@@ -1,0 +1,2 @@
+$json = '{"platforms": ["foundit"], "jobs_per_student": 2, "student_ids": ["student_4443c80f"]}'
+Invoke-RestMethod -Uri 'http://localhost:5001/api/automation/run' -Method Post -ContentType 'application/json' -Body $json

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Calibri', 'Arial', sans-serif;
+    font-size: 11pt;
+    line-height: 1.25;
+    color: #111111;
+    margin: 0;
+    padding: 0.2in 0.5in 0.2in 0.5in;
+    max-width: 8.27in;
+  }
+  h1, h2, h3, p, ul, li, strong, a {
+    font-family: 'Calibri', sans-serif;
+    color: #111111;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    clear: both;
+  }
+  a { color: #111111; display: inline-block; width: auto; clear: none; }
+  strong { display: inline; width: auto; clear: none; }
+  li { display: list-item; width: auto; clear: none; }
+  h1 {
+    font-weight: 700;
+  }
+  h2 {
+    margin: 15px 0 6px 0;
+    font-size: 13pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 1.5px solid #111111;
+    padding-bottom: 2px;
+  }
+  h3 {
+    margin: 10px 0 2px 0;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+  ul {
+    margin: 0 0 10px 18px;
+    padding: 0;
+    display: block;
+    width: 100%;
+  }
+  li {
+    margin: 0 0 4px 0;
+    text-align: justify;
+  }
+</style>
+</head>
+<body>
+    
+        <div style="text-align: center; margin-bottom: 5px;">
+            <h1 style="margin: 0; font-size: 24pt; text-transform: uppercase; font-family: 'Calibri', sans-serif;">divya peddi</h1>
+            <div style="margin-top: 2px; font-size: 14pt; font-weight: bold; color: #333;">Redux Developer</div>
+            <div style="margin-top: 4px; font-size: 10pt; color: #555;">divya@gmail.com | 7013469473 | Hyderabad, India</div>
+            <hr style="border: 0; border-top: 1.5px solid #111; margin: 10px 0 12px 0;">
+        </div>
+        
+    <h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROFESSIONAL SUMMARY</h2>
+<p>Highly skilled Redux Developer with expertise in Java, Spring Boot, Hibernate, Maven, JDBC, React, Redux, JavaScript, HTML/CSS, Webpack, Python, Pandas, NumPy, Matplotlib, Scikit-learn, Node.js, Express.js, MongoDB, AWS, CloudFormation, CloudWatch, S3, Lambda, Docker, Kubernetes, CI/CD, Jenkins, and Git.</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EDUCATION</h2>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">TECHNICAL SKILLS</h2>
+<p><strong>Programming Languages:</strong> Java, Python</p>
+<p><strong>Web Technologies:</strong> React, HTML/CSS, JavaScript, Webpack</p>
+<p><strong>Backend:</strong> Spring Boot, Node.js, Express.js, Hibernate, Maven, JDBC</p>
+<p><strong>Database:</strong> MongoDB, MySQL</p>
+<p><strong>Cloud & DevOps:</strong> AWS, CloudFormation, CloudWatch, S3, Lambda, Docker, Kubernetes, CI/CD, Jenkins, Git</p>
+<p><strong>Machine Learning & Data Science:</strong> Python, Pandas, NumPy, Matplotlib, Scikit-learn</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EXPERIENCE</h2>
+<h3>Software Engineer | Company Name | Jan 2023 - Present</h3>
+<ul>
+  <li>Responsibility 1</li>
+  <li>Responsibility 2</li>
+</ul>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROJECTS</h2>
+<h3>Project Name</h3>
+<p><strong>Tech Stack:</strong> React, Node.js, MongoDB</p>
+<ul>
+  <li>Description 1</li>
+  <li>Description 2</li>
+</ul>
+</body>
+</html>

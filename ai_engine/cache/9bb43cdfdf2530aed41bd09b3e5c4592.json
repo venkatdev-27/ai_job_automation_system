@@ -1,0 +1,53 @@
+{
+  "success": true,
+  "resumeText": "```html\n<h1>Candidate</h1>\n<p>Candidate | +91-0000000000 | candidate@example.com</p>\n\n<hr>\n\n<h2>PROFESSIONAL SUMMARY</h2>\n<p>Aspiring Frontend Developer with a strong foundation in MERN stack development. Proficient in building clean, scalable features using MongoDB, Express.js, React, and Node.js. Experienced in creating responsive user interfaces and building APIs. Seeking to leverage my skills in a dynamic and innovative environment.</p>\n\n<hr>\n\n<h2>EDUCATION</h2>\n<p>B.Sc, Computer Science, , </p>\n\n<hr>\n\n<h2>TECHNICAL SKILLS</h2>\n<ul>\n  <li><strong>Languages:</strong> JavaScript, TypeScript, HTML, CSS</li>\n  <li><strong>Frontend:</strong> React</li>\n  <li><strong>UI/UX:</strong> Responsive User Interfaces</li>\n  <li><strong>Frameworks:</strong> Express.js, Node.js</li>\n  <li><strong>Tools:</strong> MongoDB, GitHub</li>\n</ul>\n\n<hr>\n\n<h2>EXPERIENCE</h2>\n<p>No experience listed.</p>\n\n<hr>\n\n<h2>PROJECTS</h2>\n<p>No projects listed.</p>\n```",
+  "pdfPath": null,
+  "score": 68,
+  "subScores": {
+    "keywordMatch": 50,
+    "experienceDepth": 68,
+    "impactOutcome": 65,
+    "strategicAlignment": 70,
+    "atsReadability": 68
+  },
+  "matchedSkills": [
+    "Frontend"
+  ],
+  "missingSkills": [
+    "Backend"
+  ],
+  "reason": "PROFESSIONAL SUMMARY word count outside 80-110.",
+  "createdAt": "2026-04-08T19:41:21.159941",
+  "decision": "SKIP",
+  "cacheKey": "9bb43cdfdf2530aed41bd09b3e5c4592",
+  "cacheHit": false,
+  "fullName": "Candidate",
+  "roleFamily": "frontend",
+  "modelsUsed": {
+    "phase1": "llama-3.1-8b-instant",
+    "phase2": "llama-3.1-8b-instant",
+    "attempted": [
+      "llama-3.1-8b-instant"
+    ]
+  },
+  "feedbackResult": "pending",
+  "targetCompany": "",
+  "sourceSkillsUsed": [
+    "MongoDB",
+    "Express.js",
+    "React",
+    "Node.js",
+    "JavaScript",
+    "TypeScript",
+    "HTML",
+    "CSS",
+    "Full Stack",
+    "GitHub"
+  ],
+  "jobSkillsUsed": [
+    "Frontend",
+    "Backend"
+  ],
+  "feedbackLogged": true,
+  "cachedAt": "2026-04-08T19:41:21.161788"
+}

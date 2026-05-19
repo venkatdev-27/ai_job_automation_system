@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "resumeText": "```html\n<h1>Dummy PDF file</h1>\n<p>Not found</p>\n<p>Not found</p>\n<p>Not found</p>\n\n<h2>PROFESSIONAL OBJECTIVE</h2>\n<hr>\n\n<p>As an Aspiring Frontend Developer, I am excited to apply my skills in building scalable UI components using React and Node.js. With a strong understanding of REST APIs and object-oriented programming, I am confident in my ability to deliver high-quality frontend solutions. I am eager to learn and grow with a team that values innovation and collaboration.</p>\n\n<h2>EDUCATION</h2>\n<hr>\n\n<h2>TECHNICAL SKILLS</h2>\n<hr>\n\n<ul>\n  <li><strong>Languages:</strong> JavaScript, Node.js</li>\n  <li><strong>Frontend:</strong> React</li>\n  <li><strongFrameworks:</strong> Express.js, REST APIs</li>\n  <li><strong>Tools:</strong> MongoDB, AWS</li>\n</ul>\n\n<h2>PROJECTS</h2>\n<hr>\n\n<h2>EXPERIENCE</h2>\n<hr>\n```",
+  "pdfPath": "D:\\ai-bot-resumes\\ai-job-auto-apply\\resumes\\Dummy_PDF_file_20260409_135736.pdf",
+  "score": 85,
+  "subScores": {
+    "keywordMatch": 100,
+    "experienceDepth": 68,
+    "impactOutcome": 65,
+    "strategicAlignment": 70,
+    "atsReadability": 68
+  },
+  "matchedSkills": [
+    "React",
+    "Node.js",
+    "MongoDB",
+    "Express.js",
+    "REST APIs",
+    "AWS"
+  ],
+  "missingSkills": [],
+  "reason": "PROFESSIONAL OBJECTIVE word count outside 80-110.",
+  "createdAt": "2026-04-09T08:27:38.379763",
+  "decision": "APPLY",
+  "cacheKey": "0b669e721b66cf0409e4c90164c97fe8",
+  "cacheHit": false,
+  "fullName": "Dummy PDF file",
+  "roleFamily": "frontend",
+  "modelsUsed": {
+    "phase1": "llama-3.1-8b-instant",
+    "phase2": "llama-3.1-8b-instant",
+    "attempted": [
+      "llama-3.1-8b-instant"
+    ]
+  },
+  "feedbackResult": "pending",
+  "targetCompany": "",
+  "sourceSkillsUsed": [],
+  "jobSkillsUsed": [
+    "React",
+    "Node.js",
+    "MongoDB",
+    "Express.js",
+    "REST APIs",
+    "AWS"
+  ],
+  "feedbackLogged": true,
+  "cachedAt": "2026-04-09T08:27:38.380958"
+}

@@ -1,0 +1,49 @@
+services:
+  celery-naukri-1:
+    command: celery -A celery_app.app worker -Q naukri -c 1 -O fair --loglevel=info --hostname=naukri-1@%h
+    environment:
+      - MAX_PARALLEL_BROWSERS=2
+
+  celery-naukri-2:
+    profiles:
+      - high-concurrency
+
+  celery-linkedin-1:
+    command: celery -A celery_app.app worker -Q linkedin -c 1 -O fair --loglevel=info --hostname=linkedin-1@%h
+    environment:
+      - MAX_PARALLEL_BROWSERS=2
+
+  celery-foundit-1:
+    command: celery -A celery_app.app worker -Q foundit -c 1 -O fair --loglevel=info --hostname=foundit-1@%h
+    environment:
+      - MAX_PARALLEL_BROWSERS=2
+
+  ai-engine:
+    environment:
+      - LLM_MAX_CONCURRENCY=2
+      - LLM_SKILL_MAX_CONCURRENCY=2
+      - PDF_MAX_REQUESTS_PER_BROWSER=50
+
+  celery-warmup:
+    profiles:
+      - on-demand
+
+  celery-producer:
+    profiles:
+      - on-demand
+
+  celery-beat:
+    profiles:
+      - scheduled
+
+  flower:
+    profiles:
+      - monitoring
+
+  prometheus:
+    profiles:
+      - monitoring
+
+  grafana:
+    profiles:
+      - monitoring

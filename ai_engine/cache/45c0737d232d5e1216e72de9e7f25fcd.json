@@ -1,0 +1,68 @@
+{
+  "success": true,
+  "resumeText": "```html\n<h1>Veera Venkata Satyanarayana</h1>\n<p>No contact details available.</p>\n<hr>\n\n<h2>PROFESSIONAL SUMMARY</h2>\n<p>As an aspiring QA Engineer, I am excited to leverage my MERN Full Stack development skills to contribute to the growth of a dynamic team. With a strong foundation in MongoDB, Express, React, and Node.js, I am eager to learn and apply best practices in modern full stack and cloud-native development. I am confident in my ability to deliver high-quality code and collaborate with senior engineers to drive innovation.</p>\n<hr>\n\n<h2>EDUCATION</h2>\n<p>B.Sc in Computer Science</p>\n<hr>\n\n<h2>TECHNICAL SKILLS</h2>\n<hr>\n<ul>\n  <li><strong>Languages:</strong> JavaScript, TypeScript, Node.js, React</li>\n  <li><strong>Testing Tools:</strong> Testing</li>\n  <li><strong>Frameworks:</strong> Express.js, Next.js, Spring Boot</li>\n  <li><strong>Tools:</strong> MongoDB, Git, AWS</li>\n</ul>\n<hr>\n\n<h2>EXPERIENCE</h2>\n<p>No experience available.</p>\n<hr>\n\n<h2>PROJECTS</h2>\n<p>No projects available.</p>\n```",
+  "pdfPath": "D:\\ai-bot-resumes\\ai-job-auto-apply\\resumes\\Veera_Venkata_Satyanarayana_20260409_132940.pdf",
+  "score": 73,
+  "subScores": {
+    "keywordMatch": 83,
+    "experienceDepth": 68,
+    "impactOutcome": 65,
+    "strategicAlignment": 70,
+    "atsReadability": 68
+  },
+  "matchedSkills": [
+    "Full Stack",
+    "Node.js",
+    "React",
+    "Next.js",
+    "Testing",
+    "JavaScript",
+    "TypeScript",
+    "Spring Boot",
+    "AWS",
+    "Git"
+  ],
+  "missingSkills": [
+    "Backend",
+    "Frontend"
+  ],
+  "reason": "PROFESSIONAL SUMMARY word count outside 80-110.",
+  "createdAt": "2026-04-09T07:59:44.243342",
+  "decision": "SKIP",
+  "cacheKey": "45c0737d232d5e1216e72de9e7f25fcd",
+  "cacheHit": false,
+  "fullName": "Veera Venkata Satyanarayana",
+  "roleFamily": "qa",
+  "modelsUsed": {
+    "phase1": "llama-3.1-8b-instant",
+    "phase2": "llama-3.1-8b-instant",
+    "attempted": [
+      "llama-3.1-8b-instant"
+    ]
+  },
+  "feedbackResult": "pending",
+  "targetCompany": "",
+  "sourceSkillsUsed": [
+    "Full Stack",
+    "MongoDB",
+    "Express.js",
+    "React",
+    "Node.js"
+  ],
+  "jobSkillsUsed": [
+    "Full Stack",
+    "Node.js",
+    "React",
+    "Next.js",
+    "Backend",
+    "Frontend",
+    "Testing",
+    "JavaScript",
+    "TypeScript",
+    "Spring Boot",
+    "AWS",
+    "Git"
+  ],
+  "feedbackLogged": true,
+  "cachedAt": "2026-04-09T07:59:44.245037"
+}

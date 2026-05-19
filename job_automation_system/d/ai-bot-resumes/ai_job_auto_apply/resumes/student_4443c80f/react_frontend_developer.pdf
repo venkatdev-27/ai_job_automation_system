@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Calibri', 'Arial', sans-serif;
+    font-size: 11pt;
+    line-height: 1.25;
+    color: #111111;
+    margin: 0;
+    padding: 0.2in 0.5in 0.2in 0.5in;
+    max-width: 8.27in;
+  }
+  h1, h2, h3, p, ul, li, strong, a {
+    font-family: 'Calibri', sans-serif;
+    color: #111111;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    clear: both;
+  }
+  a { color: #111111; display: inline-block; width: auto; clear: none; }
+  strong { display: inline; width: auto; clear: none; }
+  li { display: list-item; width: auto; clear: none; }
+  h1 {
+    font-weight: 700;
+  }
+  h2 {
+    margin: 15px 0 6px 0;
+    font-size: 13pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: left;
+    border-bottom: 1.5px solid #111111;
+    padding-bottom: 2px;
+  }
+  h3 {
+    margin: 10px 0 2px 0;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+  p {
+    margin: 0 0 8px 0;
+    text-align: justify;
+  }
+  ul {
+    margin: 0 0 10px 18px;
+    padding: 0;
+    display: block;
+    width: 100%;
+  }
+  li {
+    margin: 0 0 4px 0;
+    text-align: justify;
+  }
+</style>
+</head>
+<body>
+    
+        <div style="text-align: center; margin-bottom: 5px;">
+            <h1 style="margin: 0; font-size: 24pt; text-transform: uppercase; font-family: 'Calibri', sans-serif;">divya peddi</h1>
+            <div style="margin-top: 2px; font-size: 14pt; font-weight: bold; color: #333;">React Frontend Developer</div>
+            <div style="margin-top: 4px; font-size: 10pt; color: #555;">divya@gmail.com | 7013469473 | Hyderabad, India</div>
+            <hr style="border: 0; border-top: 1.5px solid #111; margin: 10px 0 12px 0;">
+        </div>
+        
+    <h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROFESSIONAL SUMMARY</h2>
+<p>Highly skilled React Frontend Developer with expertise in React, Redux, JavaScript, HTML/CSS, and Webpack. Engineered scalable web applications using React and Redux. Developed efficient front-end solutions using JavaScript and Webpack. Optimized web application performance using HTML/CSS.</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EDUCATION</h2>
+<p>No education details available.</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">TECHNICAL SKILLS</h2>
+<p><strong>Programming Languages:</strong> Python, Java, JavaScript, CloudFormation, Maven, HTML/CSS, Scikit-learn, JDBC, Pandas, NumPy, Hibernate, React, CloudWatch, Express.js, Spring Boot, Webpack, Redux, Matplotlib, Node.js</p>
+<p><strong>Databases:</strong> MongoDB</p>
+<p><strong>Build Tools:</strong> Git</p>
+<p><strong>Cloud Services:</strong> AWS, S3, Lambda</p>
+<p><strong>DevOps Tools:</strong> CI/CD, Jenkins, Docker, Kubernetes</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">EXPERIENCE</h2>
+<p>No experience details available.</p>
+
+<h2 style="text-align: left; text-transform: uppercase; border-bottom: 1.5px solid #111;">PROJECTS</h2>
+<p>No projects available.</p>
+
+Note: The provided JSON data does not contain any education, experience, or project details. The above HTML code reflects this.
+</body>
+</html>

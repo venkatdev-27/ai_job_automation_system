@@ -1,0 +1,54 @@
+{
+  "success": true,
+  "resumeText": "```html\n<h1>Candidate</h1>\n<p>Candidate | +91-0000000000 | candidate@example.com</p>\n\n<hr>\n\n<h2>PROFESSIONAL SUMMARY</h2>\n<p>Aspiring Frontend Developer with 0-1 years of experience in full-stack development, proficient in JavaScript, React, Node.js, and MongoDB. Profound understanding of MERN stack and full-stack web development. Proficient in HTML, CSS, and TypeScript. Strong team collaboration and code review skills. Proficient in GitHub and willing to work on generative AI projects.</p>\n\n<hr>\n\n<h2>EDUCATION</h2>\n<p>B.Sc, Computer Science, , </p>\n\n<hr>\n\n<h2>TECHNICAL SKILLS</h2>\n<ul>\n  <li><strong>Languages:</strong> JavaScript, Python, TypeScript</li>\n  <li><strong>Frontend:</strong> React, HTML, CSS</li>\n  <li><strongFrameworks:</strong> Express.js, Node.js</li>\n  <li><strong>Tools:</strong> MongoDB, GitHub</li>\n</ul>\n\n<hr>\n\n<h2>EXPERIENCE</h2>\n<p>MERN Full Stack Developer, Not Confirmed, Not Confirmed</p>\n<ul>\n  <li>Collaborated with teams to develop and deploy full-stack web applications.</li>\n  <li>Participated in code reviews and ensured clean code quality.</li>\n  <li>Developed and tested full-stack applications using MERN stack.</li>\n  <li>Deployed applications on production environments.</li>\n  <li>Developed and deployed React applications with efficient UI/UX.</li>\n  <li>Collaborated with teams to design and implement full-stack solutions.</li>\n  <li>Participated in code reviews and ensured adherence to coding standards.</li>\n  <li>Developed and deployed Node.js applications with efficient backend logic.</li>\n  <li>Collaborated with teams to ensure timely project delivery.</li>\n</ul>\n\n<hr>\n\n<h2>PROJECTS</h2>\n\n```",
+  "pdfPath": null,
+  "score": 87,
+  "subScores": {
+    "keywordMatch": 100,
+    "experienceDepth": 68,
+    "impactOutcome": 72,
+    "strategicAlignment": 70,
+    "atsReadability": 68
+  },
+  "matchedSkills": [
+    "JavaScript",
+    "Python",
+    "Frontend"
+  ],
+  "missingSkills": [],
+  "reason": "PROFESSIONAL SUMMARY word count outside 80-110. Some bullets missed the 10-22 word target.",
+  "createdAt": "2026-04-08T19:40:53.424304",
+  "decision": "APPLY",
+  "cacheKey": "7f811f92a50a75c378e6c0a80dc64a94",
+  "cacheHit": false,
+  "fullName": "Candidate",
+  "roleFamily": "frontend",
+  "modelsUsed": {
+    "phase1": "llama-3.1-8b-instant",
+    "phase2": "llama-3.1-8b-instant",
+    "attempted": [
+      "llama-3.1-8b-instant"
+    ]
+  },
+  "feedbackResult": "pending",
+  "targetCompany": "",
+  "sourceSkillsUsed": [
+    "MongoDB",
+    "Express.js",
+    "React",
+    "Node.js",
+    "JavaScript",
+    "TypeScript",
+    "HTML",
+    "CSS",
+    "Full Stack",
+    "GitHub"
+  ],
+  "jobSkillsUsed": [
+    "JavaScript",
+    "Python",
+    "Frontend"
+  ],
+  "feedbackLogged": true,
+  "cachedAt": "2026-04-08T19:40:53.426482"
+}

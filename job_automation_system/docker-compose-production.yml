@@ -1,0 +1,455 @@
+﻿# Job Automation System - Production Docker Compose
+# ==============================================================================
+# Production-ready compose with:
+# - Resource limits (CPU/memory)
+# - Health checks
+# - Redis persistence
+# - Monitoring stack (Prometheus, Grafana, cAdvisor)
+# - Auto-restart on failure
+#
+# Usage:
+#   docker-compose -f docker-compose-production.yml up -d
+#   docker-compose -f docker-compose-production.yml down
+#
+# ==============================================================================
+
+services:
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES
+  # =============================================================================
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendfsync everysec
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Chrome CDP Container (10 concurrent sessions)
+  chrome-cdp:
+    image: browserless/chrome:latest
+    ports:
+      - "3000:3000"
+      - "9222:9222"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=20
+      - DEBUG=false
+      - ENABLE_DEBUGGER=false
+    volumes:
+      - ./chrome_profile:/tmp/browserless
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - job-automation-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # AI Engine for Resume Generation
+  ai-engine:
+    build:
+      context: ../ai_engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - IN_DOCKER=true
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    networks:
+      - job-automation-network
+    volumes:
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Node API Server (for START/RUN NOW)
+  node-api:
+    build:
+      context: ./node-api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - DOCKER_COMPOSE_PATH=/app/job_automation_system
+      - DOCKER_COMPOSE_FILE=docker-compose-production.yml
+      - DOCKER_PROJECT_NAME=job-automation
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LOCAL_API_URL=http://ai-engine:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app/job_automation_system
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
+  # CELERY WORKERS (Production-configured)
+  # =============================================================================
+
+  celery-naukri-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: no
+    command: celery -A celery_app.app worker -Q naukri -c 2 -O fair --loglevel=info --hostname=naukri-1@%h
+    environment:
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ATS_THRESHOLD=${ATS_THRESHOLD}
+      - MAX_PARALLEL_BROWSERS=10
+      - CDP_URL=http://chrome-cdp:3000
+      - USE_CDP=true
+      - LOCAL_API_URL=http://ai-engine:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+      chrome-cdp:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - job-automation-network
+
+  celery-producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: no
+    command: celery -A celery_app.app worker -Q producer,warmup -c 2 -O fair --loglevel=info --hostname=producer@%h
+    environment:
+      - CELERY_QUEUE=producer,warmup
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      # Wave Mode Configuration
+      - WAVE_MODE=${WAVE_MODE}
+      - JOBS_PER_WAVE=${JOBS_PER_WAVE}
+      - STUDENTS_PER_WAVE=${STUDENTS_PER_WAVE}
+      - WAVE_PAUSE_MIN=${WAVE_PAUSE_MIN}
+      - WAVE_PAUSE_MAX=${WAVE_PAUSE_MAX}
+      - STUDENT_SPACING_MIN=${STUDENT_SPACING_MIN}
+      - STUDENT_SPACING_MAX=${STUDENT_SPACING_MAX}
+      - TIME_BASED_WEIGHTS=${TIME_BASED_WEIGHTS}
+      - HUMAN_ACTIVITY_ENABLED=${HUMAN_ACTIVITY_ENABLED}
+      - DAY_DISTRIBUTION_ENABLED=${DAY_DISTRIBUTION_ENABLED}
+      # Beat Schedule
+      - BEAT_SCHEDULE_TIMES=${BEAT_SCHEDULE_TIMES}
+      - BEAT_PLATFORMS=${BEAT_PLATFORMS}
+      - CELERY_BEAT_ENABLED=${CELERY_BEAT_ENABLED}
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ../ai_engine/resumes:/app/ai_engine/resumes
+      - ../temp_resumes:/app/temp_resumes
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: no
+    command: celery -A celery_app.app beat --loglevel=info
+    environment:
+      - CELERY_TASK_SCOPE=beat
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
+      - IN_DOCKER=true
+      - PYTHONPATH=/app
+      # Wave Mode Configuration
+      - WAVE_MODE=${WAVE_MODE}
+      - JOBS_PER_WAVE=${JOBS_PER_WAVE}
+      - STUDENT_SPACING_MIN=${STUDENT_SPACING_MIN}
+      - STUDENT_SPACING_MAX=${STUDENT_SPACING_MAX}
+      - TIME_BASED_WEIGHTS=${TIME_BASED_WEIGHTS}
+      - DAY_DISTRIBUTION_ENABLED=${DAY_DISTRIBUTION_ENABLED}
+      # Beat Schedule
+      - BEAT_SCHEDULE_TIMES=${BEAT_SCHEDULE_TIMES}
+      - BEAT_PLATFORMS=${BEAT_PLATFORMS}
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery-producer:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - job-automation-network
+    volumes:
+      - .:/app
+
+  # =============================================================================
+  # MONITORING STACK
+  # =============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - job-automation-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - job-automation-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command: >
+      --disable_metrics=disk
+      --docker_only=true
+      --log_cadvisor_usage=false
+      --store_container_labels=false
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    networks:
+      - job-automation-network
+    privileged: true
+
+  # Flower - Celery monitoring
+  flower:
+    image: mher/flower:latest
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - job-automation-network
+
+  # =============================================================================
+  # ADMIN DASHBOARD (React Frontend)
+  # =============================================================================
+
+  admin-dashboard:
+    build:
+      context: ../admin-dashboard
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    environment:
+      - VITE_API_URL=http://node-api:5000
+    depends_on:
+      node-api:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - job-automation-network
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+
+networks:
+  job-automation-network:
+    external: true
+    name: job_automation_system_job-automation-network
+
+# =============================================================================
+# VOLUMES (Persistent data)
+# =============================================================================
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

@@ -1,0 +1,516 @@
+/* Sneat Dark Theme Variables */
+:root {
+  --primary: #7367f0;
+  --primary-hover: #5a52d9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --body-bg: #1a1a2e;
+  --card-bg: #16213e;
+  --sidebar-bg: #0f0f23;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #1e293b;
+  --hover-bg: #1e293b;
+}
+
+/* Base Styles */
+body {
+  font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--body-bg);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+/* Card Styles */
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+/* Button Styles */
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.btn-light {
+  background-color: var(--hover-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-light:hover {
+  background-color: #2d3748;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  min-height: 100vh;
+  width: 280px;
+}
+
+/* Nav hover */
+.nav-link:hover {
+  background-color: var(--hover-bg);
+}
+
+/* Text Colors */
+.text-primary {
+  color: var(--primary) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-success {
+  color: var(--success) !important;
+}
+
+.text-danger {
+  color: var(--danger) !important;
+}
+
+.text-white {
+  color: white !important;
+}
+
+/* Backgrounds */
+.bg-primary {
+  background-color: var(--primary) !important;
+}
+
+.bg-success {
+  background-color: var(--success) !important;
+}
+
+.bg-danger {
+  background-color: var(--danger) !important;
+}
+
+.bg-warning {
+  background-color: var(--warning) !important;
+}
+
+.bg-light {
+  background-color: var(--hover-bg) !important;
+}
+
+.bg-opacity-10 {
+  opacity: 0.1;
+}
+
+/* Borders */
+.border-primary {
+  border-color: var(--primary) !important;
+}
+
+.border-bottom {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.border-top {
+  border-top: 1px solid var(--border-color) !important;
+}
+
+.border-0 {
+  border: none !important;
+}
+
+/* Typography */
+.fw-bold {
+  font-weight: 700;
+}
+
+.fw-semibold {
+  font-weight: 600;
+}
+
+.fw-medium {
+  font-weight: 500;
+}
+
+/* Font Sizes */
+.fs-4 {
+  font-size: 1.25rem;
+}
+
+.fs-5 {
+  font-size: 1.25rem;
+}
+
+.fs-6 {
+  font-size: 1rem;
+}
+
+/* Layout */
+.min-vh-100 {
+  min-height: 100vh;
+}
+
+.d-flex {
+  display: flex;
+}
+
+.flex-column {
+  flex-direction: column;
+}
+
+.flex-grow-1 {
+  flex-grow: 1;
+}
+
+.align-items-center {
+  align-items: center;
+}
+
+.justify-content-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-3 {
+  gap: 1rem;
+}
+
+/* Spacing */
+.p-2 {
+  padding: 0.5rem;
+}
+
+.p-3 {
+  padding: 1rem;
+}
+
+.p-4 {
+  padding: 1.5rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.py-3 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+/* Border Radius */
+.rounded-2 {
+  border-radius: 0.5rem;
+}
+
+.rounded-3 {
+  border-radius: 0.75rem;
+}
+
+.rounded-circle {
+  border-radius: 50%;
+}
+
+/* Overflow */
+.overflow-auto {
+  overflow: auto;
+}
+
+/* Position */
+.position-fixed {
+  position: fixed;
+}
+
+.position-absolute {
+  position: absolute;
+}
+
+.top-0 {
+  top: 0;
+}
+
+.end-0 {
+  right: 0;
+}
+
+.start-100 {
+  left: 100%;
+}
+
+.translate-middle {
+  transform: translate(-50%, -50%);
+}
+
+.translate-middle-badge {
+  transform: translateX(-50%);
+}
+
+/* Z-Index */
+.z-index-1050 {
+  z-index: 1050;
+}
+
+/* Width/Height */
+.w-100 {
+  width: 100%;
+}
+
+.h-100 {
+  height: 100%;
+}
+
+/* Transitions */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+/* Box shadows */
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Form inputs (if needed) */
+.form-control {
+  background-color: var(--hover-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Tables - Dark Theme */
+.table {
+  --bs-table-bg: var(--card-bg);
+  --bs-table-color: var(--text-primary);
+  --bs-table-border-color: var(--border-color);
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.table thead th {
+  background-color: var(--sidebar-bg) !important;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.table tbody tr:hover {
+  background-color: var(--hover-bg) !important;
+}
+
+.table td {
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Card body dark */
+.card-body {
+  background-color: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+.card-header {
+  background-color: var(--sidebar-bg) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Form elements dark */
+.form-control {
+  background-color: var(--sidebar-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.form-control:focus {
+  background-color: var(--sidebar-bg) !important;
+  border-color: var(--primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Select dark */
+select.form-control,
+select {
+  background-color: var(--sidebar-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Badge styles */
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+/* Spinner colors */
+.spinner-border {
+  color: var(--primary) !important;
+}
+
+.spinner-grow {
+  color: var(--primary) !important;
+}
+
+/* Loading animations */
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(115, 103, 240, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(115, 103, 240, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(115, 103, 240, 0); }
+}
+
+.spinner-glow {
+  animation: pulse-glow 1.5s infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 360px) {
+  .sidebar {
+    width: 100% !important;
+    position: fixed !important;
+    z-index: 1000 !important;
+  }
+  
+  .container-fluid, .container {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  
+  .card {
+    margin-bottom: 12px !important;
+    border-radius: 8px !important;
+  }
+  
+  .card-body {
+    padding: 12px !important;
+  }
+  
+  .btn {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+  
+  .table {
+    font-size: 11px !important;
+  }
+  
+  .table th, .table td {
+    padding: 8px 6px !important;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-size: 90% !important;
+  }
+  
+  .col-12, .col-6, .col-4, .col-3 {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+  
+  input, select {
+    font-size: 12px !important;
+    padding: 8px !important;
+  }
+  
+  .badge {
+    font-size: 9px !important;
+    padding: 3px 6px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 240px !important;
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+    padding: 12px !important;
+  }
+  
+  .card-header {
+    padding: 12px !important;
+  }
+  
+  .card-body {
+    padding: 12px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed !important;
+    left: -280px !important;
+    transition: left 0.3s ease !important;
+    z-index: 1050 !important;
+  }
+  
+  .sidebar.show {
+    left: 0 !important;
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  .d-lg-flex {
+    display: none !important;
+  }
+  
+  .d-lg-none {
+    display: block !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .d-lg-none {
+    display: none !important;
+  }
+  
+  .d-lg-flex {
+    display: flex !important;
+  }
+}
